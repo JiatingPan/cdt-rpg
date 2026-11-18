@@ -655,7 +655,7 @@
             streakPrevValue: 0,
             currentFilter: "ALL",
             updatedAt: 0,
-            schema: 4,
+            schema: 5,
             stats: [
                 { id: "INT", code: "INT", name: "智力 · 数字孪生科研", xp: 0, color: "cyan" },
                 { id: "CHA", code: "CHA", name: "魅力 · 英西双语沟通", xp: 0, color: "purple" },
@@ -768,7 +768,18 @@
 
         // 旧版存档升级到 v4：生成模板、应用新的任务细节、宝箱改价、开始记录统计
         function migrate(s, raw) {
-            if (!raw || Number(raw.schema || 0) >= 4) return;
+            if (!raw) return;
+            const ver = Number(raw.schema || 0);
+            if (ver < 4) migrateV4(s, raw);
+            // v5：模板里的备注恢复成原始任务描述（每天的具体安排只写在当天任务上）
+            if (ver < 5) {
+                const defaults = new Map(DEFAULT_TEMPLATE.map(t => [t.id, t.desc]));
+                s.template.forEach(t => { if (defaults.has(t.id)) t.desc = defaults.get(t.id); });
+                s.schema = 5;
+            }
+        }
+
+        function migrateV4(s, raw) {
             const today = dayKey();
             if (!Array.isArray(raw.template)) s.template = s.tasks.map(taskFields);
             const patch = {
@@ -1254,11 +1265,14 @@
                                     <span class="px-1.5 py-0.5 rounded font-mono font-bold ${style.badge} border ${style.border}">${escapeHtml(stat.code)}</span>
                                     <span class="px-1.5 py-0.5 rounded font-medium border ${tBadge.cls}">${tBadge.label}</span>
                                     ${goal ? `<span class="px-1.5 py-0.5 rounded font-medium border bg-purple-500/10 text-purple-300 border-purple-500/30 max-w-[12rem] truncate"><i class="fa-solid fa-mountain mr-0.5"></i>${escapeHtml(goal.title)}</span>` : ""}
+                                    ${task.carriedFrom ? `<span class="px-1.5 py-0.5 rounded font-medium border bg-sky-500/10 text-sky-300 border-sky-500/30">⏩ ${shortDay(task.carriedFrom)} 顺延</span>` : ""}
+                                    ${task.carry && !task.completed ? `<span onclick="event.stopPropagation(); toggleCarry('${task.id}')" class="px-1.5 py-0.5 rounded font-medium border bg-amber-500/15 text-amber-300 border-amber-500/40 cursor-pointer" title="点击取消">⏭ 明天继续 ✕</span>` : ""}
                                     <span class="font-mono font-semibold text-cyan-400 ml-1">+${task.xp} XP</span>
                                     <span class="font-mono font-semibold text-amber-400">+${task.gold} 金</span>
                                 </div>
                             </div>
                             <div class="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
+                                ${task.completed ? "" : `<button onclick="toggleCarry('${task.id}')" class="p-1.5 rounded-lg ${task.carry ? "text-amber-300 bg-amber-500/10" : "text-slate-500 hover:text-amber-300 hover:bg-slate-800"} cursor-pointer" title="没做完，顺延到明天"><i class="fa-solid fa-forward text-xs"></i></button>`}
                                 <button onclick="openTaskModal('${task.id}')" class="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-slate-800 cursor-pointer" title="编辑"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
                                 <button onclick="deleteTask('${task.id}')" class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 cursor-pointer" title="删除"><i class="fa-solid fa-trash-can text-xs"></i></button>
                             </div>
@@ -1461,11 +1475,29 @@
             renderAll();
         }
 
+        function shortDay(k) { const d = parseDay(k); return `${d.getMonth() + 1}/${d.getDate()}`; }
+
+        function toggleCarry(taskId) {
+            const t = state.tasks.find(x => x.id === taskId);
+            if (!t || t.completed) return;
+            t.carry = !t.carry;
+            saveState();
+            renderTasks();
+            showToast(t.carry ? "⏭ 已标记：明天会继续出现这项任务" : "已取消顺延", "info");
+        }
+
         // ---------- 每天凌晨 4 点按模板刷新 ----------
         function checkRollover() {
             const today = dayKey();
             if (state.currentDate === today) return false;
-            state.tasks = state.template.map(t => ({ ...taskFields(t), completed: false }));
+            // 标记了「顺延」且没完成的任务，带到新的一天（放在最前面）
+            const from = state.currentDate;
+            const carried = state.tasks.filter(t => t.carry && !t.completed).map(t => {
+                const inTpl = state.template.some(x => x.id === t.id);
+                // 模板任务明天本来就会出现，所以顺延的是额外的一份，例如「文献 1 篇」→ 明天要做 2 篇
+                return { ...taskFields(t), id: inTpl ? uid("carry") : t.id, completed: false, carriedFrom: t.carriedFrom || from };
+            });
+            state.tasks = [...carried, ...state.template.map(t => ({ ...taskFields(t), completed: false }))];
             state.currentDate = today;
             saveState();
             renderAll();
@@ -1519,7 +1551,8 @@
             document.getElementById("taskXpInput").value = task ? task.xp : 25;
             document.getElementById("taskGoldInput").value = task ? task.gold : 15;
             document.getElementById("taskScopeRow").classList.toggle("hidden", fromTemplate);
-            document.getElementById("taskScopeInput").value = (task && !tpl) ? "today" : "template";
+            // 编辑已有任务默认只改今天（写当天的具体安排）；新建任务默认加入模板
+            document.getElementById("taskScopeInput").value = task ? "today" : "template";
             document.getElementById("taskModal").classList.remove("hidden");
         }
 
