@@ -914,9 +914,9 @@
         }
 
         // force=true：无论新旧，直接用云端覆盖本机（用于第二台设备首次连接）
-        async function cloudPull({ force = false, silent = true } = {}) {
+        async function cloudPull({ force = false, silent = true, quiet = false } = {}) {
             if (!syncEnabled() || pushTimer) return;
-            setSyncStatus("busy");
+            if (!quiet) setSyncStatus("busy");
             try {
                 const gist = await gh(`/gists/${syncCfg.gistId}`);
                 const f = gist.files && gist.files[GIST_FILE];
@@ -1072,6 +1072,12 @@
             checkRollover();
         }
         setInterval(() => { if (state.currentDate !== dayKey()) refreshDay(); }, 60000);
+
+        // 页面开着时每 30 秒静默检查一次云端，另一台设备的修改会自动出现
+        setInterval(() => {
+            if (syncEnabled() && document.visibilityState === "visible" && !pushTimer && syncStatus !== "busy") cloudPull({ quiet: true });
+        }, 30000);
+        window.addEventListener("focus", () => { if (syncEnabled() && !pushTimer) cloudPull({ quiet: true }); });
 
         // ==================== 分区导航 ====================
         const TABS = ["today", "goals", "character", "shop"];
