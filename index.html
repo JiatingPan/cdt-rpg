@@ -81,7 +81,7 @@
                     <span id="syncText" class="hidden sm:inline text-slate-300">未开启同步</span>
                     <span id="syncDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
                 </button>
-                <div class="px-2.5 sm:px-3 py-2 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 text-xs sm:text-sm font-medium flex items-center gap-1.5" title="每天凌晨 4 点自动按模板刷新任务">
+                <div class="px-2.5 sm:px-3 py-2 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 text-xs sm:text-sm font-medium flex items-center gap-1.5" title="每天 0 点自动按模板刷新任务">
                     <i class="fa-solid fa-sun"></i>
                     <span id="todayDateLabel">今天</span>
                 </div>
@@ -130,7 +130,7 @@
                                 <span id="playerNameDisplay" class="font-bold text-base text-white truncate">数字孪生学者</span>
                                 <button onclick="editPlayerName()" class="text-slate-500 hover:text-cyan-400 text-xs p-1" title="修改角色头衔"><i class="fa-solid fa-pen"></i></button>
                             </div>
-                            <p class="text-[11px] text-slate-400">多尺度建模 · 跨文化探索者</p>
+                            <p class="text-[11px] text-amber-300 font-medium truncate" id="playerTitle" title="多尺度建模 · 跨文化探索者">🎖 见习学者</p>
                         </div>
                     </div>
                     <div class="inline-flex items-baseline gap-1 px-3 py-1 rounded-xl bg-cyan-500/15 border border-cyan-500/30 shrink-0">
@@ -161,7 +161,8 @@
                         <i class="fa-solid fa-fire text-orange-400"></i>
                         <div>
                             <div class="text-[10px] text-slate-400">连续打卡</div>
-                            <div class="font-mono text-lg font-bold text-orange-400 leading-tight"><span id="streakCount">1</span><span class="text-xs font-sans font-normal text-slate-400"> 天</span></div>
+                            <div class="font-mono text-lg font-bold text-orange-400 leading-tight"><span id="streakCount">0</span><span class="text-xs font-sans font-normal text-slate-400"> 天</span></div>
+                            <div id="streakHint" class="text-[10px] leading-tight"></div>
                         </div>
                     </div>
                 </div>
@@ -182,7 +183,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div>
                         <h2 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-list-check text-cyan-400"></i>今日任务</h2>
-                        <p class="text-xs text-slate-400 mt-0.5">每天凌晨 4 点自动按「每日模板」刷新；勾选即结算 XP 与金币，并记入统计</p>
+                        <p class="text-xs text-slate-400 mt-0.5">每天 0 点自动按「每日模板」刷新；勾选即结算 XP 与金币，并记入统计</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <button onclick="openTemplateModal()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition flex items-center gap-1.5 cursor-pointer">
@@ -248,6 +249,21 @@
 
         <!-- ==================== 分区 3：角色属性 ==================== -->
         <section id="tab-character" class="tab-panel hidden space-y-5">
+            <!-- 称号之路 -->
+            <div class="glow-card rounded-2xl p-5 sm:p-6">
+                <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+                    <div>
+                        <h2 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-medal text-amber-400"></i>称号之路</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">按坚持时间设计：每天完成约 75% 的日常任务（约 116 XP），大约这么久升一级</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[11px] text-slate-400">当前称号</div>
+                        <div id="titleCurrent" class="font-bold text-amber-300">见习学者</div>
+                    </div>
+                </div>
+                <div id="titleList" class="space-y-1.5"></div>
+            </div>
+
             <!-- 打卡统计 -->
             <div class="glow-card rounded-2xl p-5 sm:p-6">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -267,8 +283,8 @@
             <div class="glow-card rounded-2xl p-5 sm:p-6">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
                     <div>
-                        <h2 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-chart-simple text-cyan-400"></i>核心属性维度</h2>
-                        <p class="text-xs text-slate-400 mt-0.5">每项属性每满 100 XP 提升 1 阶</p>
+                        <h2 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-chart-simple text-cyan-400"></i>属性统计</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">百分比是该属性占你全部 XP 的比例，看看精力是否平衡</p>
                     </div>
                     <button onclick="openStatModal()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer">
                         <i class="fa-solid fa-sliders"></i><span>管理属性维度</span>
@@ -481,7 +497,7 @@
                 <h3 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-clipboard-list text-cyan-400"></i>每日模板</h3>
                 <button onclick="closeModal('templateModal')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
-            <p class="text-xs text-slate-400 mb-4">每天凌晨 4 点，今日任务会重置成这份清单。在这里的修改会同步到今天还没完成的任务。</p>
+            <p class="text-xs text-slate-400 mb-4">每天 0 点，今日任务会重置成这份清单。在这里的修改会同步到今天还没完成的任务。</p>
             <div id="templateList" class="space-y-2 mb-4"></div>
             <button onclick="openTaskModal(null, true)" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 text-xs font-semibold cursor-pointer"><i class="fa-solid fa-plus mr-1"></i>向模板添加任务</button>
         </div>
@@ -633,7 +649,7 @@
         // ==================== 默认模板 ====================
         const clone = (o) => JSON.parse(JSON.stringify(o));
 
-        // 每日模板：每天凌晨 4 点，今日任务会重置成这份清单
+        // 每日模板：每天 0 点，今日任务会重置成这份清单
         const DEFAULT_TEMPLATE = [
             { id: "t1", title: "深度科研推进（4-5小时）", desc: "运行心脏多尺度仿真模型、调试电生理参数或处理医学影像数据", statId: "INT", goalId: "g1", xp: 50, gold: 30, type: "DAILY" },
             { id: "t2", title: "领域核心文献破译（1篇）", desc: "拆解数学模型逻辑或仿真边界条件设置，沉淀进个人知识库", statId: "INT", goalId: "g1", xp: 20, gold: 15, type: "DAILY" },
@@ -655,7 +671,7 @@
             streakPrevValue: 0,
             currentFilter: "ALL",
             updatedAt: 0,
-            schema: 5,
+            schema: 7,
             stats: [
                 { id: "INT", code: "INT", name: "智力 · 数字孪生科研", xp: 0, color: "cyan" },
                 { id: "CHA", code: "CHA", name: "魅力 · 英西双语沟通", xp: 0, color: "purple" },
@@ -688,6 +704,8 @@
             template: clone(DEFAULT_TEMPLATE),
             tasks: DEFAULT_TEMPLATE.map(t => ({ ...clone(t), completed: false })),
             log: {},
+            repaired: {},   // 补签/旧版连续打卡的日期：{ "2026-11-17": "chest" | "legacy" }
+            bonusGold: {},  // 里程碑、目标奖励等非任务收入：{ 日期: 金币 }
             currentDate: "",
             rewards: [
                 { id: "r1", icon: "🥉", title: "铜宝箱 · 睡前小确幸", desc: "23:00前完成整理，泡一杯苹果肉桂茶，无负罪感看30分钟剧/闲书", cost: 50 },
@@ -754,8 +772,8 @@
         const uid = (p) => p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
         // ==================== 存档加载与保存 ====================
-        // ---------- 日期工具：一天从凌晨 4 点开始算，熬夜到 1 点完成的任务仍算前一天 ----------
-        const DAY_START_HOUR = 4;
+        // ---------- 日期工具：每天 0 点为新的一天 ----------
+        const DAY_START_HOUR = 0;
         const pad2 = (x) => String(x).padStart(2, "0");
         const fmtDate = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
         function dayKey(d = new Date()) { return fmtDate(new Date(d.getTime() - DAY_START_HOUR * 3600000)); }
@@ -776,6 +794,33 @@
                 const defaults = new Map(DEFAULT_TEMPLATE.map(t => [t.id, t.desc]));
                 s.template.forEach(t => { if (defaults.has(t.id)) t.desc = defaults.get(t.id); });
                 s.schema = 5;
+            }
+            // v6：连续打卡改为按每天的打卡记录计算；旧版累计的天数记为「旧版记录」保留下来
+            if (ver < 6) {
+                if (!s.repaired || typeof s.repaired !== "object") s.repaired = {};
+                const n = Number(s.streak || 0), last = s.streakLastDay;
+                if (n > 0 && last) {
+                    for (let i = 0; i < n; i++) {
+                        const k = shiftDay(last, -i);
+                        if (!(s.log && s.log[k] && s.log[k].length)) s.repaired[k] = "legacy";
+                    }
+                }
+                s.schema = 6;
+            }
+            // v7：从 2026-11-19 开始重新记录，清掉这之前的所有统计记录（XP、金币、等级不受影响）
+            if (ver < 7) {
+                const CUTOFF = "2026-11-19";
+                ["log", "repaired", "bonusGold"].forEach(f => {
+                    if (s[f]) Object.keys(s[f]).forEach(k => { if (k < CUTOFF) delete s[f][k]; });
+                });
+                if (Array.isArray(s.history)) {
+                    s.history = s.history.filter(h => {
+                        if (h.day) return h.day >= CUTOFF;
+                        const m = /^(\d{2})-(\d{2})/.exec(h.time || "");
+                        return m ? `2026-${m[1]}-${m[2]}` >= CUTOFF : false;
+                    });
+                }
+                s.schema = 7;
             }
         }
 
@@ -811,7 +856,7 @@
             const base = clone(DEFAULT_STATE);
             const s = { ...base, ...(obj || {}) };
             ["stats", "tasks", "rewards", "history", "goals", "chests", "perks", "template"].forEach(k => { if (!Array.isArray(s[k])) s[k] = clone(base[k]); });
-            if (!s.log || typeof s.log !== "object" || Array.isArray(s.log)) s.log = {};
+            ["log", "repaired", "bonusGold"].forEach(k => { if (!s[k] || typeof s[k] !== "object" || Array.isArray(s[k])) s[k] = {}; });
             migrate(s, obj);
             if (!s.currentDate) s.currentDate = dayKey();
             s.goals.forEach(g => {
@@ -922,6 +967,9 @@
             Object.keys(src.log).forEach(k => {
                 if (k !== target.currentDate && !(k in target.log)) target.log[k] = src.log[k];
             });
+            ["repaired", "bonusGold"].forEach(f => Object.keys(src[f] || {}).forEach(k => {
+                if (k !== target.currentDate && !(k in target[f])) target[f][k] = src[f][k];
+            }));
         }
 
         // force=true：无论新旧，直接用云端覆盖本机（用于第二台设备首次连接）
@@ -1105,9 +1153,16 @@
 
         // ==================== 等级计算 ====================
         function calculateLevelInfo(totalXp) {
-            let level = 1, remainingXp = Math.max(0, totalXp), xpNeeded = 200;
-            while (remainingXp >= xpNeeded) { remainingXp -= xpNeeded; level++; xpNeeded = level * 200; }
-            return { level, currentLevelXp: remainingXp, nextLevelXp: xpNeeded, progressPercent: Math.min(100, Math.round((remainingXp / xpNeeded) * 100)) };
+            const xp = Math.max(0, totalXp);
+            let i = 0;
+            while (i + 1 < LEVELS.length && xp >= LEVELS[i + 1].xp) i++;
+            let level = i + 1, start = LEVELS[i].xp, next;
+            if (i === LEVELS.length - 1) {
+                const extra = Math.floor((xp - start) / XP_PER_YEAR);
+                level += extra; start += extra * XP_PER_YEAR; next = start + XP_PER_YEAR;
+            } else next = LEVELS[i + 1].xp;
+            const cur = xp - start, need = next - start;
+            return { level, currentLevelXp: cur, nextLevelXp: need, progressPercent: Math.min(100, Math.floor(cur / need * 100)) };
         }
 
         // 统一结算经验和金币（正数发放，负数回退）
@@ -1118,7 +1173,7 @@
             const stat = state.stats.find(s => s.id === statId);
             if (stat) stat.xp = Math.max(0, stat.xp + xp);
             const newLevel = calculateLevelInfo(state.totalXp).level;
-            if (newLevel > prevLevel) showToast(`🎉 恭喜升级！学者等级提升至 LV.${newLevel}！`, "levelup");
+            if (newLevel > prevLevel) showToast(`🎉 升级到 LV.${newLevel}！获得新称号「${levelTitle(newLevel)}」`, "levelup");
         }
 
         function getStat(id) {
@@ -1150,6 +1205,7 @@
         function renderAll() {
             renderDashboard();
             renderStats();
+            renderTitles();
             renderTasks();
             renderMiniGoals();
             renderGoals();
@@ -1169,7 +1225,7 @@
             document.getElementById("totalXpDisplay").textContent = state.totalXp;
             document.getElementById("levelProgressBar").style.width = `${lv.progressPercent}%`;
             document.getElementById("goldBalance").textContent = state.gold;
-            document.getElementById("streakCount").textContent = displayStreak();
+            renderStreakTile();
             const td = parseDay(state.currentDate);
             document.getElementById("todayDateLabel").textContent = `${td.getMonth() + 1}/${td.getDate()} ${WEEKDAYS[td.getDay()]}`;
 
@@ -1192,11 +1248,77 @@
             }
         }
 
+        // ==================== 等级与称号（按坚持时间设计） ====================
+        // 约 116 XP/天 ≈ 3,500 XP/月
+        const LEVELS = [
+            { xp: 0, title: "见习学者", span: "起点" },
+            { xp: 7000, title: "初级研究员", span: "约 2 个月" },
+            { xp: 14000, title: "青年研究员", span: "约 4 个月" },
+            { xp: 21000, title: "实验室骨干", span: "约 6 个月" },
+            { xp: 28000, title: "课题攻坚者", span: "约 8 个月" },
+            { xp: 35000, title: "资深研究员", span: "约 10 个月" },
+            { xp: 42000, title: "独立研究者", span: "约 1 年" },
+            { xp: 84000, title: "学科带头人", span: "约 2 年" },
+            { xp: 126000, title: "数字孪生大师", span: "约 3 年" },
+            { xp: 210000, title: "跨尺度宗师", span: "约 5 年" }
+        ];
+        const XP_PER_YEAR = 42000; // 5 年之后每多坚持约 1 年再升 1 级
+
+        function levelTitle(level) {
+            if (level <= LEVELS.length) return LEVELS[level - 1].title;
+            return `${LEVELS[LEVELS.length - 1].title} ${"★".repeat(level - LEVELS.length)}`;
+        }
+
+        function renderTitles() {
+            const lv = calculateLevelInfo(state.totalXp);
+            const title = levelTitle(lv.level);
+            document.getElementById("playerTitle").textContent = `🎖 ${title}`;
+            const cur = document.getElementById("titleCurrent");
+            if (!cur) return;
+            cur.textContent = title;
+            document.getElementById("titleList").innerHTML = LEVELS.map((L, i) => {
+                const n = i + 1;
+                const got = lv.level >= n;
+                const isNext = lv.level + 1 === n;
+                const pct = isNext ? lv.progressPercent : 0;
+                return `
+                    <div class="rounded-xl px-3 py-2 border ${lv.level === n ? "bg-amber-500/10 border-amber-500/40" : "bg-slate-900/60 border-slate-800"} ${got || isNext ? "" : "opacity-50"}">
+                        <div class="flex items-center gap-2 text-xs">
+                            <span class="font-mono text-[10px] text-slate-500 w-9 shrink-0">LV.${n}</span>
+                            <span class="flex-1 ${got ? "text-amber-300 font-semibold" : "text-slate-300"}">${L.title}</span>
+                            <span class="text-[10px] text-slate-500 shrink-0">${L.span}</span>
+                            <span class="font-mono text-[10px] text-slate-400 w-16 text-right shrink-0">${L.xp.toLocaleString()}</span>
+                            ${got ? `<i class="fa-solid fa-check text-emerald-400 text-[10px] w-3"></i>` : `<i class="fa-solid fa-lock text-slate-600 text-[10px] w-3"></i>`}
+                        </div>
+                        ${isNext ? `<div class="mt-1.5 w-full h-1 bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-amber-400 rounded-full" style="width:${pct}%"></div></div>
+                            <div class="text-[10px] text-slate-500 mt-1">还差 ${(lv.nextLevelXp - lv.currentLevelXp).toLocaleString()} XP</div>` : ""}
+                    </div>`;
+            }).join("") + (lv.level >= LEVELS.length ? `<p class="text-[11px] text-slate-400 mt-2">之后每多积累 ${XP_PER_YEAR.toLocaleString()} XP（约 1 年）再升 1 级，称号后加一颗 ★</p>` : "");
+        }
+
+        // 按属性统计某段日期内（含首尾）任务带来的 XP 和完成次数
+        function statXpBetween(from, to) {
+            const out = {};
+            Object.keys(state.log).forEach(k => {
+                if (k < from || k > to) return;
+                state.log[k].forEach(e => {
+                    const o = out[e.statId] || (out[e.statId] = { xp: 0, n: 0 });
+                    o.xp += e.xp; o.n += 1;
+                });
+            });
+            return out;
+        }
+
         function renderStats() {
+            const today = state.currentDate;
+            const week = statXpBetween(shiftDay(today, -6), today);
+            const month = statXpBetween(today.slice(0, 7) + "-01", today);
+            const total = state.stats.reduce((a, s) => a + s.xp, 0) || 1;
             document.getElementById("statsGrid").innerHTML = state.stats.map(stat => {
                 const style = COLOR_STYLES[stat.color] || COLOR_STYLES.cyan;
-                const lvl = Math.floor(stat.xp / 100) + 1;
-                const mod = stat.xp % 100;
+                const share = Math.round(stat.xp / total * 100);
+                const w = week[stat.id] || { xp: 0, n: 0 };
+                const m = month[stat.id] || { xp: 0, n: 0 };
                 return `
                     <div class="bg-slate-900/75 border border-slate-800 rounded-xl p-4">
                         <div class="flex items-center justify-between gap-2 mb-2">
@@ -1204,12 +1326,16 @@
                                 <span class="px-2 py-0.5 rounded-md font-mono text-[11px] font-bold ${style.badge} border ${style.border}">${escapeHtml(stat.code)}</span>
                                 <span class="text-sm font-medium text-slate-200 truncate">${escapeHtml(stat.name)}</span>
                             </div>
-                            <span class="font-mono text-sm font-bold ${style.text} shrink-0">Lv.${lvl}</span>
+                            <span class="font-mono text-sm font-bold ${style.text} shrink-0">${share}%</span>
                         </div>
-                        <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden mb-1.5">
-                            <div class="progress-bar-fill h-full ${style.bg} rounded-full" style="width:${mod}%"></div>
+                        <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden mb-2.5" title="占总 XP 的比例">
+                            <div class="progress-bar-fill h-full ${style.bg} rounded-full" style="width:${share}%"></div>
                         </div>
-                        <div class="flex justify-between text-[10px] font-mono text-slate-500"><span>累计 ${stat.xp} XP</span><span>${mod}/100</span></div>
+                        <div class="grid grid-cols-3 gap-2 text-center">
+                            <div class="bg-slate-950/60 rounded-lg py-1.5"><div class="text-[10px] text-slate-500">累计</div><div class="font-mono text-xs text-slate-200">${stat.xp.toLocaleString()}</div></div>
+                            <div class="bg-slate-950/60 rounded-lg py-1.5"><div class="text-[10px] text-slate-500">近 7 天</div><div class="font-mono text-xs ${style.text}">+${w.xp}</div><div class="text-[9px] text-slate-500">${w.n} 次</div></div>
+                            <div class="bg-slate-950/60 rounded-lg py-1.5"><div class="text-[10px] text-slate-500">本月</div><div class="font-mono text-xs ${style.text}">+${m.xp}</div><div class="text-[9px] text-slate-500">${m.n} 次</div></div>
+                        </div>
                     </div>`;
             }).join("");
         }
@@ -1432,22 +1558,81 @@
 
         // ==================== 每日任务 ====================
         // ---------- 连续打卡：今天完成第 1 项时 +1；昨天也打过卡才算连续 ----------
+        function hasCheckin(k) { return !!((state.log[k] && state.log[k].length) || state.repaired[k]); }
+
+        // 连续打卡：从今天（今天还没打卡就从昨天）往前数，连续有打卡记录的天数；断一天就从 0 重新算
         function displayStreak() {
-            const today = dayKey();
-            return (state.streakLastDay === today || state.streakLastDay === shiftDay(today, -1)) ? state.streak : 0;
+            const today = state.currentDate;
+            let k = hasCheckin(today) ? today : shiftDay(today, -1);
+            let n = 0;
+            while (hasCheckin(k) && n < 3660) { n++; k = shiftDay(k, -1); }
+            return n;
         }
 
-        function onDayCountChange(before, after) {
+        function renderStreakTile() {
+            const n = displayStreak();
             const today = state.currentDate;
-            if (before === 0 && after > 0 && state.streakLastDay !== today) {
-                state.streakPrevDay = state.streakLastDay;
-                state.streakPrevValue = state.streak;
-                state.streak = state.streakLastDay === shiftDay(today, -1) ? state.streak + 1 : 1;
-                state.streakLastDay = today;
-            } else if (before > 0 && after === 0 && state.streakLastDay === today) {
-                state.streak = state.streakPrevValue;
-                state.streakLastDay = state.streakPrevDay;
+            const hint = document.getElementById("streakHint");
+            document.getElementById("streakCount").textContent = n;
+            if (hasCheckin(today)) {
+                hint.innerHTML = `<span class="text-emerald-400">今日已打卡</span>`;
+            } else if (n > 0) {
+                hint.innerHTML = `<span class="text-slate-400">今天还没打卡</span>`;
+            } else {
+                const y = shiftDay(today, -1);
+                const canFix = !hasCheckin(y) && hasCheckin(shiftDay(y, -1));
+                hint.innerHTML = canFix
+                    ? `<button onclick="goRepair('${y}')" class="text-rose-300 underline cursor-pointer">已中断 · 补签</button>`
+                    : `<span class="text-rose-300">已中断，打卡重新计数</span>`;
             }
+        }
+
+        function goRepair(k) {
+            statsView = "day"; statsMonth = k.slice(0, 7); statsSelected = k;
+            switchTab("character");
+            renderLogStats();
+        }
+
+        function repairCost() { return (state.chests.find(c => c.tier === "small") || { cost: 50 }).cost; }
+
+        function canRepair(k) {
+            return k < state.currentDate && k >= shiftDay(state.currentDate, -30) && !hasCheckin(k);
+        }
+
+        function repairDay(k) {
+            if (!canRepair(k)) return;
+            const cost = repairCost();
+            if (state.gold < cost) { showToast(`金币不足，补签需要 ${cost} 金币`, "error"); return; }
+            const d = parseDay(k);
+            showConfirm(`补签 ${d.getMonth() + 1}/${d.getDate()}？`, `消耗一个铜宝箱的金币（${cost}）把这一天记为已打卡，连续打卡天数会重新连上。`, () => {
+                state.gold -= cost;
+                state.repaired[k] = "chest";
+                state.history.unshift({ icon: "🩹", title: `补签 ${d.getMonth() + 1}/${d.getDate()}`, cost, time: nowStamp(), day: state.currentDate });
+                saveState(); renderAll();
+                showToast(`🩹 补签成功！连续打卡 ${displayStreak()} 天`, "levelup");
+            });
+        }
+
+        function nowStamp() {
+            const n = new Date();
+            return `${pad2(n.getMonth() + 1)}-${pad2(n.getDate())} ${pad2(n.getHours())}:${pad2(n.getMinutes())}`;
+        }
+
+        // 兑换记录属于哪一天（旧记录只有「月-日」，按今年推算）
+        function historyDay(h) {
+            if (h.day) return h.day;
+            const m = /^(\d{2})-(\d{2})/.exec(h.time || "");
+            if (!m) return "";
+            const today = state.currentDate;
+            let y = Number(today.slice(0, 4));
+            if (`${y}-${m[1]}-${m[2]}` > today) y -= 1;
+            return `${y}-${m[1]}-${m[2]}`;
+        }
+
+        function addBonusGold(n) {
+            const k = state.currentDate;
+            state.bonusGold[k] = (state.bonusGold[k] || 0) + n;
+            if (!state.bonusGold[k]) delete state.bonusGold[k];
         }
 
         function toggleTask(taskId, event) {
@@ -1468,7 +1653,6 @@
             const next = dayLog.filter(e => e.tid !== task.id);
             if (task.completed) next.push(logEntry(task));
             if (next.length) state.log[key] = next; else delete state.log[key];
-            onDayCountChange(before, next.length);
 
             if (task.completed && event) spawnFloatingText(event.clientX, event.clientY, `+${task.xp} XP  +${task.gold} 金币`);
             saveState();
@@ -1486,7 +1670,7 @@
             showToast(t.carry ? "⏭ 已标记：明天会继续出现这项任务" : "已取消顺延", "info");
         }
 
-        // ---------- 每天凌晨 4 点按模板刷新 ----------
+        // ---------- 每天 0 点按模板刷新 ----------
         function checkRollover() {
             const today = dayKey();
             if (state.currentDate === today) return false;
@@ -1686,13 +1870,36 @@
             return list.reduce((a, e) => ({ n: a.n + 1, xp: a.xp + e.xp, gold: a.gold + e.gold }), { n: 0, xp: 0, gold: 0 });
         }
 
+        function spentOn(k) { return state.history.filter(h => historyDay(h) === k); }
+
+        function dayMoney(k) {
+            const tasks = state.log[k] || [];
+            const earn = tasks.reduce((a, e) => a + e.gold, 0) + (state.bonusGold[k] || 0);
+            const spend = spentOn(k).reduce((a, h) => a + Number(h.cost || 0), 0);
+            return { n: tasks.length, earn, spend };
+        }
+
         function monthSummary(ym) {
-            const days = Object.keys(state.log).filter(k => k.startsWith(ym)).sort();
-            const all = days.flatMap(k => state.log[k]);
+            const logDays = Object.keys(state.log).filter(k => k.startsWith(ym) && state.log[k].length).sort();
+            const all = logDays.flatMap(k => state.log[k]);
             const counts = {};
             all.forEach(e => { counts[e.title] = (counts[e.title] || 0) + 1; });
-            return { days, ...sumEntries(all), counts };
+            const bonus = Object.keys(state.bonusGold).filter(k => k.startsWith(ym)).reduce((a, k) => a + state.bonusGold[k], 0);
+            const spend = state.history.filter(h => historyDay(h).startsWith(ym)).reduce((a, h) => a + Number(h.cost || 0), 0);
+            const checkDays = new Set([...logDays, ...Object.keys(state.repaired).filter(k => k.startsWith(ym))]);
+            const sum = sumEntries(all);
+            return { days: [...checkDays], ...sum, earn: sum.gold + bonus, spend, counts };
         }
+
+        // 热度：按当天完成的任务数量分 5 档
+        const HEAT = [
+            { min: 0, bg: "rgba(30,41,59,0.6)" },
+            { min: 1, bg: "rgba(16,185,129,0.22)" },
+            { min: 3, bg: "rgba(16,185,129,0.42)" },
+            { min: 5, bg: "rgba(16,185,129,0.62)" },
+            { min: 7, bg: "rgba(16,185,129,0.85)" }
+        ];
+        function heatBg(n) { let bg = HEAT[0].bg; HEAT.forEach(h => { if (n >= h.min) bg = h.bg; }); return bg; }
 
         function renderLogStats() {
             const dayEl = document.getElementById("statsDayView");
@@ -1707,7 +1914,6 @@
             const today = state.currentDate;
             if (!statsMonth) statsMonth = today.slice(0, 7);
             if (!statsSelected) statsSelected = today;
-            const tplSize = Math.max(1, state.template.filter(t => t.type === "DAILY").length);
 
             if (statsView === "day") {
                 const [y, m] = statsMonth.split("-").map(Number);
@@ -1719,41 +1925,64 @@
                 for (let i = 0; i < lead; i++) cells += `<div></div>`;
                 for (let d = 1; d <= daysIn; d++) {
                     const k = `${statsMonth}-${pad2(d)}`;
-                    const n = (state.log[k] || []).length;
-                    const a = n ? Math.min(0.85, 0.2 + 0.65 * n / tplSize) : 0;
+                    const mo = dayMoney(k);
+                    const rep = state.repaired[k];
                     const sel = k === statsSelected;
                     const future = k > today;
-                    cells += `<button onclick="selectStatsDay('${k}')" class="aspect-square rounded-lg flex flex-col items-center justify-center text-[11px] cursor-pointer border ${sel ? "border-cyan-400" : k === today ? "border-emerald-500/60" : "border-transparent"} ${future ? "opacity-30" : ""}" style="background:${n ? `rgba(16,185,129,${a})` : "rgba(30,41,59,0.6)"}">
-                        <span class="${n ? "text-white font-semibold" : "text-slate-500"}">${d}</span>
-                        ${n ? `<span class="font-mono text-[9px] text-emerald-100">${n}</span>` : ""}
+                    cells += `<button onclick="selectStatsDay('${k}')" class="min-h-[64px] rounded-lg px-0.5 py-1 flex flex-col items-center justify-start gap-0.5 cursor-pointer border ${sel ? "border-cyan-400" : k === today ? "border-emerald-400/70" : rep ? "border-sky-500/50 border-dashed" : "border-transparent"} ${future ? "opacity-30" : ""}" style="background:${heatBg(mo.n)}">
+                        <span class="text-[11px] leading-none ${mo.n ? "text-white font-semibold" : "text-slate-500"}">${d}${rep === "chest" ? "🩹" : ""}</span>
+                        ${mo.n ? `<span class="font-mono text-[9px] leading-none text-emerald-100">✓${mo.n}</span>` : ""}
+                        ${mo.earn ? `<span class="font-mono text-[9px] leading-none text-amber-300">+${mo.earn}</span>` : ""}
+                        ${mo.spend ? `<span class="font-mono text-[9px] leading-none text-rose-300">-${mo.spend}</span>` : ""}
                     </button>`;
                 }
+
                 const list = state.log[statsSelected] || [];
-                const ds = sumEntries(list);
+                const spends = spentOn(statsSelected);
+                const mo = dayMoney(statsSelected);
                 const sd = parseDay(statsSelected);
+                const rep = state.repaired[statsSelected];
+                let repairBlock = "";
+                if (rep === "chest") repairBlock = `<p class="text-xs text-sky-300 mt-3">🩹 这一天已用铜宝箱补签，计入连续打卡</p>`;
+                else if (rep === "legacy" && !list.length) repairBlock = `<p class="text-xs text-slate-400 mt-3">📜 旧版记录的打卡日，计入连续打卡</p>`;
+                else if (canRepair(statsSelected)) repairBlock = `
+                    <button onclick="repairDay('${statsSelected}')" class="mt-3 w-full py-2 rounded-xl ${state.gold >= repairCost() ? "bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/40 cursor-pointer" : "bg-slate-800 text-slate-500 cursor-not-allowed"} text-xs font-semibold">
+                        🩹 用铜宝箱补签这一天（${repairCost()} 金币）
+                    </button>`;
+
                 dayEl.innerHTML = `
                     <div class="flex items-center justify-between mb-3">
                         <button onclick="shiftStatsMonth(-1)" class="p-2 text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-chevron-left"></i></button>
                         <div class="text-center">
                             <div class="font-bold text-white">${y} 年 ${m} 月</div>
-                            <div class="text-[11px] text-slate-400">打卡 <strong class="text-emerald-300">${sum.days.length}</strong> 天 · 完成 <strong class="text-white">${sum.n}</strong> 项 · <span class="text-cyan-400">+${sum.xp} XP</span> · <span class="text-amber-400">+${sum.gold} 金</span></div>
+                            <div class="text-[11px] text-slate-400">打卡 <strong class="text-emerald-300">${sum.days.length}</strong> 天 · 完成 <strong class="text-white">${sum.n}</strong> 项 · <span class="text-amber-300">收入 +${sum.earn}</span> · <span class="text-rose-300">支出 -${sum.spend}</span></div>
                         </div>
                         <button onclick="shiftStatsMonth(1)" class="p-2 text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-chevron-right"></i></button>
                     </div>
-                    <div class="grid grid-cols-7 gap-1.5 text-center text-[10px] text-slate-500 mb-1.5">${["一", "二", "三", "四", "五", "六", "日"].map(w => `<div>${w}</div>`).join("")}</div>
-                    <div class="grid grid-cols-7 gap-1.5 mb-5">${cells}</div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] text-slate-500 mb-1">${["一", "二", "三", "四", "五", "六", "日"].map(w => `<div>${w}</div>`).join("")}</div>
+                    <div class="grid grid-cols-7 gap-1 mb-2">${cells}</div>
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500 mb-5">
+                        <div class="flex items-center gap-1">完成任务数 <span>少</span>${HEAT.map(h => `<span class="w-3 h-3 rounded-sm inline-block" style="background:${h.bg}"></span>`).join("")}<span>多</span><span class="ml-1">(0 / 1-2 / 3-4 / 5-6 / 7+)</span></div>
+                        <div><span class="text-amber-300">+收入</span> · <span class="text-rose-300">-支出</span> 金币</div>
+                    </div>
                     <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-4">
                         <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
                             <div class="font-semibold text-sm text-white">${sd.getMonth() + 1} 月 ${sd.getDate()} 日 ${WEEKDAYS[sd.getDay()]}${statsSelected === today ? " · 今天" : ""}</div>
-                            <div class="text-[11px] font-mono"><span class="text-slate-300">${ds.n} 项</span> · <span class="text-cyan-400">+${ds.xp} XP</span> · <span class="text-amber-400">+${ds.gold} 金</span></div>
+                            <div class="text-[11px] font-mono"><span class="text-slate-300">✓${mo.n} 项</span> · <span class="text-amber-300">+${mo.earn}</span> · <span class="text-rose-300">-${mo.spend}</span> 金币</div>
                         </div>
                         ${list.length ? `<div class="space-y-1.5">${list.map(e => {
                             const st = getStat(e.statId); const sty = COLOR_STYLES[st.color] || COLOR_STYLES.cyan;
-                            return `<div class="flex items-center gap-2 text-xs"><i class="fa-solid fa-check text-emerald-400 text-[10px]"></i><span class="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${sty.badge} border ${sty.border}">${escapeHtml(st.code)}</span><span class="text-slate-200 truncate">${escapeHtml(e.title)}</span></div>`;
-                        }).join("")}</div>` : `<p class="text-xs text-slate-500">这一天没有完成记录</p>`}
+                            return `<div class="flex items-center gap-2 text-xs"><i class="fa-solid fa-check text-emerald-400 text-[10px]"></i><span class="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${sty.badge} border ${sty.border}">${escapeHtml(st.code)}</span><span class="text-slate-200 truncate flex-1">${escapeHtml(e.title)}</span><span class="font-mono text-[10px] text-amber-300 shrink-0">+${e.gold}</span></div>`;
+                        }).join("")}</div>` : `<p class="text-xs text-slate-500">这一天没有完成任务</p>`}
+                        ${state.bonusGold[statsSelected] ? `<div class="flex items-center gap-2 text-xs mt-1.5"><i class="fa-solid fa-mountain text-purple-400 text-[10px]"></i><span class="text-slate-300 flex-1">里程碑 / 目标奖励</span><span class="font-mono text-[10px] text-amber-300">+${state.bonusGold[statsSelected]}</span></div>` : ""}
+                        ${spends.length ? `<div class="mt-3 pt-3 border-t border-slate-800 space-y-1.5">${spends.map(h => `<div class="flex items-center gap-2 text-xs"><span>${escapeHtml(h.icon || "🎁")}</span><span class="text-slate-300 truncate flex-1">${escapeHtml(h.title)}</span><span class="font-mono text-[10px] text-rose-300 shrink-0">-${h.cost}</span></div>`).join("")}</div>` : ""}
+                        ${repairBlock}
                     </div>`;
             } else {
-                const months = [...new Set(Object.keys(state.log).map(k => k.slice(0, 7)))].sort().reverse();
+                const months = [...new Set([
+                    ...Object.keys(state.log), ...Object.keys(state.repaired), ...Object.keys(state.bonusGold),
+                    ...state.history.map(historyDay).filter(Boolean)
+                ].map(k => k.slice(0, 7)))].sort().reverse();
                 monEl.innerHTML = months.length ? `<div class="space-y-3">${months.map(ym => {
                     const sm = monthSummary(ym);
                     const [y, m] = ym.split("-").map(Number);
@@ -1763,13 +1992,21 @@
                         <details class="bg-slate-900/70 border border-slate-800 rounded-xl p-4" ${ym === today.slice(0, 7) ? "open" : ""}>
                             <summary class="cursor-pointer flex flex-wrap items-center justify-between gap-2">
                                 <span class="font-semibold text-sm text-white flex items-center gap-2"><i class="fa-solid fa-chevron-right chev text-[10px] text-slate-500 transition-transform"></i>${y} 年 ${m} 月</span>
-                                <span class="text-[11px] font-mono text-slate-400">打卡 <strong class="text-emerald-300">${sm.days.length}</strong> 天 · ${sm.n} 项 · <span class="text-cyan-400">+${sm.xp} XP</span> · <span class="text-amber-400">+${sm.gold} 金</span></span>
+                                <span class="text-[11px] font-mono text-slate-400">打卡 <strong class="text-emerald-300">${sm.days.length}</strong> 天 · ${sm.n} 项 · <span class="text-amber-300">+${sm.earn}</span> · <span class="text-rose-300">-${sm.spend}</span> 金</span>
                             </summary>
-                            <div class="mt-3 space-y-2">${top.map(([title, c]) => `
+                            <div class="mt-3 flex flex-wrap gap-1.5">${(() => {
+                                const last = new Date(y, m, 0).getDate();
+                                const bs = statXpBetween(`${ym}-01`, `${ym}-${pad2(last)}`);
+                                return state.stats.filter(st => bs[st.id]).map(st => {
+                                    const sty = COLOR_STYLES[st.color] || COLOR_STYLES.cyan;
+                                    return `<span class="text-[10px] px-2 py-0.5 rounded-md font-mono ${sty.badge} border ${sty.border}">${escapeHtml(st.code)} +${bs[st.id].xp} XP · ${bs[st.id].n} 次</span>`;
+                                }).join("");
+                            })()}</div>
+                            <div class="mt-3 space-y-2">${top.length ? top.map(([title, c]) => `
                                 <div>
                                     <div class="flex justify-between text-xs mb-0.5"><span class="text-slate-300 truncate pr-2">${escapeHtml(title)}</span><span class="font-mono text-slate-400 shrink-0">${c} 次</span></div>
                                     <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:${Math.round(c / max * 100)}%"></div></div>
-                                </div>`).join("")}
+                                </div>`).join("") : `<p class="text-xs text-slate-500">这个月没有完成任务的记录</p>`}
                             </div>
                         </details>`;
                 }).join("")}</div>` : `<p class="text-xs text-slate-500 text-center py-6">还没有打卡记录，完成第一项任务后就会出现</p>`;
@@ -1840,6 +2077,7 @@
             m.done = !m.done;
             const sign = m.done ? 1 : -1;
             grant(g.statId, sign * MILESTONE_XP, sign * MILESTONE_GOLD);
+            addBonusGold(sign * MILESTONE_GOLD);
             if (m.done && event) spawnFloatingText(event.clientX, event.clientY, `里程碑 +${MILESTONE_XP} XP +${MILESTONE_GOLD} 金币`);
             const p = goalProgress(g);
             if (m.done && p.done === p.total) showToast("所有里程碑完成！点击「达成」领取终极奖励 🏆", "levelup");
@@ -1852,6 +2090,7 @@
             if (!g) return;
             showConfirm(`达成「${g.title}」🏆`, `将获得 ${g.rewardXp} XP 与 ${g.rewardGold} 金币，目标会移入「已达成」。`, () => {
                 grant(g.statId, g.rewardXp, g.rewardGold);
+                addBonusGold(g.rewardGold);
                 g.completed = true;
                 g.completedAt = new Date().toISOString().slice(0, 10);
                 saveState(); renderAll();
@@ -1864,6 +2103,7 @@
             if (!g) return;
             showConfirm("重新激活目标", `会扣回达成奖励（${g.rewardXp} XP / ${g.rewardGold} 金币），目标回到进行中。`, () => {
                 grant(g.statId, -g.rewardXp, -g.rewardGold);
+                addBonusGold(-g.rewardGold);
                 g.completed = false;
                 g.completedAt = "";
                 saveState(); renderAll();
@@ -1925,7 +2165,7 @@
             showConfirm(`兑换「${r.title}」`, `将消耗 ${r.cost} 金币。兑换后请尽情享受！`, () => {
                 state.gold -= r.cost;
                 const n = new Date(), p = (x) => String(x).padStart(2, "0");
-                state.history.unshift({ icon: r.icon, title: r.title, cost: r.cost, time: `${p(n.getMonth() + 1)}-${p(n.getDate())} ${p(n.getHours())}:${p(n.getMinutes())}` });
+                state.history.unshift({ icon: r.icon, title: r.title, cost: r.cost, time: nowStamp(), day: state.currentDate });
                 saveState(); renderAll();
                 showToast(`🎉 成功兑换「${r.title}」！`, "levelup");
             });
@@ -2093,6 +2333,7 @@
                 title: `${d.chest.name}：${d.perk.text}`,
                 perkText: d.perk.text,
                 cost: d.chest.cost - d.refund,
+                day: state.currentDate,
                 time: `${pad(n.getMonth() + 1)}-${pad(n.getDate())} ${pad(n.getHours())}:${pad(n.getMinutes())}`
             });
             currentDraw = null;
