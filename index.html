@@ -70,7 +70,7 @@
                 </div>
                 <h1 class="font-bold text-base sm:text-lg tracking-tight text-white truncate">
                     数字孪生学者 RPG
-                    <span class="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 ml-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 align-middle">v3.0 同步版</span>
+                    <span class="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 ml-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 align-middle">v9</span>
                 </h1>
             </div>
 
@@ -103,6 +103,9 @@
                             <input type="file" id="importFileInput" accept=".json,application/json" class="hidden" onchange="importData(event)">
                         </label>
                         <div class="border-t border-slate-800 my-1"></div>
+                        <button onclick="openFreshStart()" class="w-full px-4 py-2.5 text-left text-sm text-amber-300 hover:bg-amber-500/10 flex items-center gap-2.5">
+                            <i class="fa-solid fa-broom w-4"></i> 清除所有记录，重新开始
+                        </button>
                         <button onclick="confirmResetAll()" class="w-full px-4 py-2.5 text-left text-sm text-rose-400 hover:bg-rose-500/10 flex items-center gap-2.5">
                             <i class="fa-solid fa-rotate-left w-4"></i> 恢复默认模板
                         </button>
@@ -111,6 +114,14 @@
             </div>
         </div>
     </header>
+
+    <!-- 新版本提醒 -->
+    <div id="updateBanner" class="hidden fixed top-20 inset-x-0 z-[58] px-4">
+        <div class="max-w-md mx-auto bg-cyan-500 text-slate-950 rounded-2xl shadow-2xl px-4 py-3 flex items-center justify-between gap-3">
+            <span class="text-sm font-semibold"><i class="fa-solid fa-arrows-rotate mr-1.5"></i>网站有新版本</span>
+            <button onclick="location.replace(location.pathname + '?v=' + Date.now())" class="px-3 py-1.5 rounded-xl bg-slate-950 text-cyan-300 text-xs font-bold cursor-pointer">立即刷新</button>
+        </div>
+    </div>
 
     <div id="toastContainer" class="fixed bottom-24 md:bottom-5 right-0 md:right-5 z-[60] flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 md:px-0"></div>
 
@@ -204,6 +215,28 @@
             </div>
 
             <div class="lg:col-span-4 space-y-5">
+                <!-- 今日餐饮 -->
+                <div class="glow-card rounded-2xl p-5">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2"><i class="fa-solid fa-utensils text-orange-400"></i>今日餐饮</h3>
+                        <span id="mealSummary" class="text-[11px] text-slate-500"></span>
+                    </div>
+                    <div id="mealList" class="space-y-2.5"></div>
+
+                    <div class="mt-4 pt-4 border-t border-slate-800/80">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-semibold text-xs text-slate-300 flex items-center gap-1.5"><i class="fa-solid fa-basket-shopping text-emerald-400"></i>采购清单</h4>
+                            <span id="shopSummary" class="text-[11px] text-slate-500"></span>
+                        </div>
+                        <form onsubmit="addShopItem(event)" class="flex gap-2 mb-2">
+                            <input type="text" id="shopInput" maxlength="40" placeholder="要买什么？例如：鸡蛋 1 盒" class="flex-1 min-w-0 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-xs text-white focus:outline-none focus:border-emerald-500">
+                            <button type="submit" class="px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-semibold cursor-pointer"><i class="fa-solid fa-plus"></i></button>
+                        </form>
+                        <div id="shopQuick" class="flex flex-wrap gap-1 mb-2"></div>
+                        <div id="shopList" class="space-y-1"></div>
+                    </div>
+                </div>
+
                 <div class="glow-card rounded-2xl p-5">
                     <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2 mb-3"><i class="fa-solid fa-flag-checkered text-emerald-400"></i>今日战况</h3>
                     <div class="flex items-end justify-between mb-2">
@@ -620,6 +653,49 @@
         </div>
     </div>
 
+    <!-- ==================== 模态框：清除所有记录 ==================== -->
+    <div id="freshModal" class="hidden fixed inset-0 z-[56] bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-md w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="w-12 h-12 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-xl mx-auto mb-3"><i class="fa-solid fa-broom"></i></div>
+            <h3 class="font-bold text-base text-white text-center mb-4">清除所有记录，重新开始</h3>
+            <div class="grid grid-cols-2 gap-3 text-xs mb-4">
+                <div class="bg-rose-500/5 border border-rose-500/25 rounded-xl p-3">
+                    <div class="font-semibold text-rose-300 mb-1.5">会清空</div>
+                    <ul class="text-slate-300 space-y-0.5 leading-relaxed">
+                        <li>· XP、等级、称号、金币</li>
+                        <li>· 各属性的 XP</li>
+                        <li>· 打卡统计、连续打卡、补签</li>
+                        <li>· 兑换和开宝箱记录</li>
+                        <li>· 餐饮记录、已买的采购项</li>
+                        <li>· 今天的勾选、里程碑进度、已达成目标</li>
+                    </ul>
+                </div>
+                <div class="bg-emerald-500/5 border border-emerald-500/25 rounded-xl p-3">
+                    <div class="font-semibold text-emerald-300 mb-1.5">会保留</div>
+                    <ul class="text-slate-300 space-y-0.5 leading-relaxed">
+                        <li>· 每日模板</li>
+                        <li>· 长期目标和里程碑内容</li>
+                        <li>· 属性维度设置</li>
+                        <li>· 喜好池、宝箱价格</li>
+                        <li>· 固定兑换的奖励</li>
+                        <li>· 还没买的采购项</li>
+                        <li>· 云同步设置</li>
+                    </ul>
+                </div>
+            </div>
+            <label class="flex items-start gap-2 text-xs text-slate-300 mb-3 cursor-pointer">
+                <input type="checkbox" id="freshBackup" checked class="mt-0.5 accent-cyan-500">
+                <span>清除前先自动下载一份备份（JSON），以后想恢复可以「导入备份」</span>
+            </label>
+            <label class="block text-xs text-slate-400 mb-1">确认操作：请输入 <strong class="text-amber-300">重新开始</strong></label>
+            <input type="text" id="freshConfirmInput" oninput="checkFreshInput()" autocomplete="off" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white mb-4 focus:outline-none focus:border-amber-500">
+            <div class="flex gap-3">
+                <button onclick="closeModal('freshModal')" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer">取消</button>
+                <button id="freshGoBtn" onclick="doFreshStart()" disabled class="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-500 font-bold text-xs cursor-not-allowed">清除并重新开始</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ==================== 模态框：确认 & 改名 ==================== -->
     <div id="confirmModal" class="hidden fixed inset-0 z-[55] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center">
@@ -671,7 +747,7 @@
             streakPrevValue: 0,
             currentFilter: "ALL",
             updatedAt: 0,
-            schema: 7,
+            schema: 8,
             stats: [
                 { id: "INT", code: "INT", name: "智力 · 数字孪生科研", xp: 0, color: "cyan" },
                 { id: "CHA", code: "CHA", name: "魅力 · 英西双语沟通", xp: 0, color: "purple" },
@@ -706,6 +782,10 @@
             log: {},
             repaired: {},   // 补签/旧版连续打卡的日期：{ "2026-11-17": "chest" | "legacy" }
             bonusGold: {},  // 里程碑、目标奖励等非任务收入：{ 日期: 金币 }
+            meals: {},      // 每天三餐：{ 日期: { breakfast: { text, type, done }, lunch, dinner } }
+            shopping: [],   // 采购清单：[{ id, text, done, doneDay }]
+            shopFreq: {},   // 买过的东西和次数，用来生成「常买」快捷按钮
+            resetId: "",    // 每次「清除所有记录」都会换一个新 id，云同步不会把旧记录合并回来
             currentDate: "",
             rewards: [
                 { id: "r1", icon: "🥉", title: "铜宝箱 · 睡前小确幸", desc: "23:00前完成整理，泡一杯苹果肉桂茶，无负罪感看30分钟剧/闲书", cost: 50 },
@@ -822,6 +902,7 @@
                 }
                 s.schema = 7;
             }
+            if (ver < 8) s.schema = 8; // v8：新增餐饮、采购清单、清除记录（新字段由默认值补齐）
         }
 
         function migrateV4(s, raw) {
@@ -855,8 +936,8 @@
         function normalizeState(obj) {
             const base = clone(DEFAULT_STATE);
             const s = { ...base, ...(obj || {}) };
-            ["stats", "tasks", "rewards", "history", "goals", "chests", "perks", "template"].forEach(k => { if (!Array.isArray(s[k])) s[k] = clone(base[k]); });
-            ["log", "repaired", "bonusGold"].forEach(k => { if (!s[k] || typeof s[k] !== "object" || Array.isArray(s[k])) s[k] = {}; });
+            ["stats", "tasks", "rewards", "history", "goals", "chests", "perks", "template", "shopping"].forEach(k => { if (!Array.isArray(s[k])) s[k] = clone(base[k]); });
+            ["log", "repaired", "bonusGold", "meals", "shopFreq"].forEach(k => { if (!s[k] || typeof s[k] !== "object" || Array.isArray(s[k])) s[k] = {}; });
             migrate(s, obj);
             if (!s.currentDate) s.currentDate = dayKey();
             s.goals.forEach(g => {
@@ -964,10 +1045,12 @@
         // 两台设备的存档以较新的为准，但过去日子的打卡记录取并集，避免统计丢失
         function mergeLogs(target, src) {
             if (!src || !src.log) return;
+            // 其中一边「清除所有记录」过，就不再把另一边的旧记录合并回来
+            if ((target.resetId || "") !== (src.resetId || "")) return;
             Object.keys(src.log).forEach(k => {
                 if (k !== target.currentDate && !(k in target.log)) target.log[k] = src.log[k];
             });
-            ["repaired", "bonusGold"].forEach(f => Object.keys(src[f] || {}).forEach(k => {
+            ["repaired", "bonusGold", "meals"].forEach(f => Object.keys(src[f] || {}).forEach(k => {
                 if (k !== target.currentDate && !(k in target[f])) target[f][k] = src[f][k];
             }));
         }
@@ -1207,6 +1290,7 @@
             renderStats();
             renderTitles();
             renderTasks();
+            renderMeals();
             renderMiniGoals();
             renderGoals();
             renderChests();
@@ -1682,6 +1766,8 @@
                 return { ...taskFields(t), id: inTpl ? uid("carry") : t.id, completed: false, carriedFrom: t.carriedFrom || from };
             });
             state.tasks = [...carried, ...state.template.map(t => ({ ...taskFields(t), completed: false }))];
+            // 采购清单：已经买到的移走，没买的留到新的一天
+            state.shopping = state.shopping.filter(i => !i.done);
             state.currentDate = today;
             saveState();
             renderAll();
@@ -1850,6 +1936,163 @@
             });
         }
 
+        // ==================== 今日餐饮 ====================
+        const MEAL_SLOTS = [
+            { key: "breakfast", label: "早餐", icon: "🌅", ph: "例如：燕麦 + 鸡蛋" },
+            { key: "lunch", label: "午餐", icon: "☀️", ph: "例如：食堂 / 自带便当" },
+            { key: "dinner", label: "晚餐", icon: "🌙", ph: "例如：番茄炒蛋 + 米饭" }
+        ];
+        const MEAL_TYPES = {
+            home: { label: "自己做", icon: "🍳", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" },
+            out: { label: "在外吃", icon: "🍽️", cls: "bg-sky-500/20 text-sky-300 border-sky-500/40" },
+            takeaway: { label: "外卖", icon: "🥡", cls: "bg-amber-500/20 text-amber-300 border-amber-500/40" },
+            skip: { label: "没吃", icon: "⏭", cls: "bg-slate-700/60 text-slate-300 border-slate-600" }
+        };
+
+        function todayMeals() { return state.meals[state.currentDate] || {}; }
+
+        function setMeal(slot, field, value) {
+            const k = state.currentDate;
+            const day = state.meals[k] || (state.meals[k] = {});
+            const m = day[slot] || (day[slot] = { text: "", type: "" });
+            if (field === "type") m.type = m.type === value ? "" : value; // 再点一次取消
+            else m.text = String(value).trim();
+            if (!m.text && !m.type) delete day[slot];
+            if (!Object.keys(day).length) delete state.meals[k];
+            saveState();
+            renderMeals();
+            renderLogStats();
+        }
+
+        function renderMeals() {
+            const el = document.getElementById("mealList");
+            if (!el) return;
+            const day = todayMeals();
+            const recorded = MEAL_SLOTS.filter(s => day[s.key] && day[s.key].type).length;
+            document.getElementById("mealSummary").textContent = `已记录 ${recorded}/3`;
+            el.innerHTML = MEAL_SLOTS.map(s => {
+                const m = day[s.key] || { text: "", type: "" };
+                return `
+                    <div class="bg-slate-900/70 border ${m.type ? "border-slate-700" : "border-slate-800"} rounded-xl p-2.5">
+                        <div class="flex items-center gap-2 mb-1.5">
+                            <span class="text-sm w-5 text-center">${s.icon}</span>
+                            <span class="text-xs font-semibold text-slate-200 w-8 shrink-0">${s.label}</span>
+                            <input type="text" value="${escapeHtml(m.text)}" maxlength="50" placeholder="${s.ph}" onchange="setMeal('${s.key}', 'text', this.value)" class="flex-1 min-w-0 px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-orange-500">
+                        </div>
+                        <div class="flex flex-wrap gap-1 pl-7">
+                            ${Object.entries(MEAL_TYPES).map(([k, t]) => `
+                                <button onclick="setMeal('${s.key}', 'type', '${k}')" class="px-1.5 py-0.5 rounded-md text-[10px] border cursor-pointer ${m.type === k ? t.cls : "border-slate-800 text-slate-500 hover:text-slate-300"}">${t.icon} ${t.label}</button>`).join("")}
+                        </div>
+                    </div>`;
+            }).join("");
+            renderShopping();
+        }
+
+        // ---------- 采购清单 ----------
+        function addShopItem(event, preset) {
+            if (event) event.preventDefault();
+            const input = document.getElementById("shopInput");
+            const text = (preset || input.value).trim();
+            if (!text) return;
+            if (state.shopping.some(i => !i.done && i.text === text)) { showToast("清单里已经有了", "info"); return; }
+            state.shopping.push({ id: uid("buy"), text, done: false, doneDay: "" });
+            if (!preset) input.value = "";
+            saveState();
+            renderShopping();
+        }
+
+        function toggleShopItem(id) {
+            const i = state.shopping.find(x => x.id === id);
+            if (!i) return;
+            i.done = !i.done;
+            i.doneDay = i.done ? state.currentDate : "";
+            state.shopFreq[i.text] = Math.max(0, (state.shopFreq[i.text] || 0) + (i.done ? 1 : -1));
+            if (!state.shopFreq[i.text]) delete state.shopFreq[i.text];
+            saveState();
+            renderShopping();
+        }
+
+        function removeShopItem(id) {
+            state.shopping = state.shopping.filter(x => x.id !== id);
+            saveState();
+            renderShopping();
+        }
+
+        function renderShopping() {
+            const list = document.getElementById("shopList");
+            if (!list) return;
+            const todo = state.shopping.filter(i => !i.done);
+            const done = state.shopping.filter(i => i.done);
+            document.getElementById("shopSummary").textContent = todo.length ? `待买 ${todo.length} 项` : (done.length ? "都买齐了 ✓" : "");
+            list.innerHTML = [...todo, ...done].map(i => `
+                <div class="group flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-800/50">
+                    <button onclick="toggleShopItem('${i.id}')" class="w-4 h-4 rounded border flex items-center justify-center shrink-0 cursor-pointer ${i.done ? "bg-emerald-500 border-emerald-400 text-slate-950" : "border-slate-600 text-transparent"}"><i class="fa-solid fa-check text-[8px]"></i></button>
+                    <span onclick="toggleShopItem('${i.id}')" class="flex-1 text-xs cursor-pointer ${i.done ? "line-through text-slate-500" : "text-slate-200"}">${escapeHtml(i.text)}</span>
+                    <button onclick="removeShopItem('${i.id}')" class="text-slate-600 hover:text-rose-400 text-[10px] p-1 md:opacity-0 md:group-hover:opacity-100 cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>`).join("") || `<p class="text-[11px] text-slate-500 px-2">清单是空的。没买的东西会自动留到第二天。</p>`;
+
+            const inList = new Set(todo.map(i => i.text));
+            const quick = Object.entries(state.shopFreq).filter(([t]) => !inList.has(t)).sort((a, b) => b[1] - a[1]).slice(0, 8);
+            document.getElementById("shopQuick").innerHTML = quick.length
+                ? `<span class="text-[10px] text-slate-500 mr-0.5 self-center">常买：</span>` + quick.map(([t]) => `<button onclick="addShopItem(null, ${escapeHtml(JSON.stringify(t))})" class="px-1.5 py-0.5 rounded-md text-[10px] border border-slate-700 text-slate-400 hover:text-emerald-300 hover:border-emerald-500/40 cursor-pointer">+ ${escapeHtml(t)}</button>`).join("")
+                : "";
+        }
+
+        // ==================== 清除所有记录，重新开始 ====================
+        function openFreshStart() {
+            document.getElementById("dataMenu").classList.add("hidden");
+            document.getElementById("freshConfirmInput").value = "";
+            document.getElementById("freshBackup").checked = true;
+            checkFreshInput();
+            document.getElementById("freshModal").classList.remove("hidden");
+        }
+
+        function checkFreshInput() {
+            const ok = document.getElementById("freshConfirmInput").value.trim() === "重新开始";
+            const btn = document.getElementById("freshGoBtn");
+            btn.disabled = !ok;
+            btn.className = `flex-1 py-2.5 rounded-xl font-bold text-xs ${ok ? "bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer" : "bg-slate-800 text-slate-500 cursor-not-allowed"}`;
+        }
+
+        function downloadBackup(prefix) {
+            const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${prefix}_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function doFreshStart() {
+            if (document.getElementById("freshConfirmInput").value.trim() !== "重新开始") return;
+            if (document.getElementById("freshBackup").checked) downloadBackup("DigitalTwin_RPG_重新开始前备份");
+
+            state.totalXp = 0;
+            state.gold = 0;
+            state.stats.forEach(st => { st.xp = 0; });
+            state.log = {};
+            state.repaired = {};
+            state.bonusGold = {};
+            state.meals = {};
+            state.history = [];
+            state.shopping = state.shopping.filter(i => !i.done);
+            state.streak = 0; state.streakLastDay = ""; state.streakPrevDay = ""; state.streakPrevValue = 0;
+            state.tasks.forEach(t => { t.completed = false; t.carry = false; delete t.carriedFrom; });
+            state.goals.forEach(g => {
+                g.milestones.forEach(m => { m.done = false; });
+                g.checkins = 0; g.completed = false; g.completedAt = "";
+            });
+            state.resetId = uid("reset");
+            state.currentDate = dayKey();
+            statsSelected = null; statsMonth = null;
+
+            closeModal("freshModal");
+            saveState();
+            renderAll();
+            showToast("🌱 已清除所有记录，从今天重新开始！", "success");
+        }
+
         // ==================== 打卡统计 ====================
         let statsView = "day";
         let statsMonth = null;   // "YYYY-MM"
@@ -1976,11 +2219,19 @@
                         }).join("")}</div>` : `<p class="text-xs text-slate-500">这一天没有完成任务</p>`}
                         ${state.bonusGold[statsSelected] ? `<div class="flex items-center gap-2 text-xs mt-1.5"><i class="fa-solid fa-mountain text-purple-400 text-[10px]"></i><span class="text-slate-300 flex-1">里程碑 / 目标奖励</span><span class="font-mono text-[10px] text-amber-300">+${state.bonusGold[statsSelected]}</span></div>` : ""}
                         ${spends.length ? `<div class="mt-3 pt-3 border-t border-slate-800 space-y-1.5">${spends.map(h => `<div class="flex items-center gap-2 text-xs"><span>${escapeHtml(h.icon || "🎁")}</span><span class="text-slate-300 truncate flex-1">${escapeHtml(h.title)}</span><span class="font-mono text-[10px] text-rose-300 shrink-0">-${h.cost}</span></div>`).join("")}</div>` : ""}
+                        ${(() => {
+                            const md = state.meals[statsSelected];
+                            if (!md) return "";
+                            return `<div class="mt-3 pt-3 border-t border-slate-800 space-y-1">${MEAL_SLOTS.filter(sl => md[sl.key]).map(sl => {
+                                const m = md[sl.key], t = MEAL_TYPES[m.type];
+                                return `<div class="flex items-center gap-2 text-xs"><span class="w-5 text-center">${sl.icon}</span><span class="text-slate-400 w-8 shrink-0">${sl.label}</span><span class="text-slate-200 truncate flex-1">${escapeHtml(m.text || "—")}</span>${t ? `<span class="text-[10px] px-1.5 py-0.5 rounded border ${t.cls} shrink-0">${t.icon} ${t.label}</span>` : ""}</div>`;
+                            }).join("")}</div>`;
+                        })()}
                         ${repairBlock}
                     </div>`;
             } else {
                 const months = [...new Set([
-                    ...Object.keys(state.log), ...Object.keys(state.repaired), ...Object.keys(state.bonusGold),
+                    ...Object.keys(state.log), ...Object.keys(state.repaired), ...Object.keys(state.bonusGold), ...Object.keys(state.meals),
                     ...state.history.map(historyDay).filter(Boolean)
                 ].map(k => k.slice(0, 7)))].sort().reverse();
                 monEl.innerHTML = months.length ? `<div class="space-y-3">${months.map(ym => {
@@ -2002,6 +2253,15 @@
                                     return `<span class="text-[10px] px-2 py-0.5 rounded-md font-mono ${sty.badge} border ${sty.border}">${escapeHtml(st.code)} +${bs[st.id].xp} XP · ${bs[st.id].n} 次</span>`;
                                 }).join("");
                             })()}</div>
+                            ${(() => {
+                                const cnt = { home: 0, out: 0, takeaway: 0, skip: 0 };
+                                Object.keys(state.meals).filter(k => k.startsWith(ym)).forEach(k => MEAL_SLOTS.forEach(sl => {
+                                    const t = state.meals[k][sl.key] && state.meals[k][sl.key].type;
+                                    if (t && t in cnt) cnt[t]++;
+                                }));
+                                const total = cnt.home + cnt.out + cnt.takeaway + cnt.skip;
+                                return total ? `<div class="mt-2 text-[11px] text-slate-400">餐饮：${Object.entries(MEAL_TYPES).filter(([k]) => cnt[k]).map(([k, t]) => `${t.icon} ${t.label} ${cnt[k]} 次`).join(" · ")}</div>` : "";
+                            })()}
                             <div class="mt-3 space-y-2">${top.length ? top.map(([title, c]) => `
                                 <div>
                                     <div class="flex justify-between text-xs mb-0.5"><span class="text-slate-300 truncate pr-2">${escapeHtml(title)}</span><span class="font-mono text-slate-400 shrink-0">${c} 次</span></div>
@@ -2544,8 +2804,23 @@
             return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
         }
 
+        // ==================== 新版本检测 ====================
+        // 每次上传新的 index.html 时把这个数字 +1，已打开的页面会提示刷新
+        const APP_VERSION = "9";
+        async function checkForUpdate() {
+            if (!/^https?:/.test(location.protocol)) return;
+            try {
+                const res = await fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" });
+                const m = /const APP_VERSION = "(\d+)"/.exec(await res.text());
+                if (m && m[1] !== APP_VERSION) document.getElementById("updateBanner").classList.remove("hidden");
+            } catch (e) {}
+        }
+        document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
+        setInterval(checkForUpdate, 10 * 60000);
+
         // ==================== 初始化 ====================
         window.onload = function () {
+            checkForUpdate();
             switchTab(activeTab);
             renderAll();
             refreshDay();
