@@ -70,7 +70,7 @@
                 </div>
                 <h1 class="font-bold text-base sm:text-lg tracking-tight text-white truncate">
                     数字孪生学者 RPG
-                    <span class="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 ml-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 align-middle">v9</span>
+                    <span class="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 ml-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 align-middle">v11</span>
                 </h1>
             </div>
 
@@ -334,7 +334,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div>
                         <h2 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-dice text-amber-400"></i>神秘宝箱 · 随机奖励</h2>
-                        <p class="text-xs text-slate-400 mt-0.5">从你的「喜好池」里抽奖，会根据今天做了什么、星期几、几点自动调整概率</p>
+                        <p class="text-xs text-slate-400 mt-0.5">靠工作量获得：当天日常任务全部完成 → 铜宝箱；一周达标 6 天 → 银宝箱；一月达标 20 天 → 金宝箱。三种互不影响，没开的会一直保留</p>
                     </div>
                     <button onclick="openPerkModal()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer">
                         <i class="fa-solid fa-heart"></i><span>管理我的喜好池</span>
@@ -394,6 +394,11 @@
                 <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">执行标准 / 备注</label>
                     <input type="text" id="taskDescInput" placeholder="例如：跑通单心室模型收敛测试，记录日志" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">小步骤清单（每行一个，可留空）</label>
+                    <textarea id="taskStepsInput" rows="4" placeholder="墨墨背单词&#10;Speaking 口语练习&#10;Vlog" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white focus:outline-none focus:border-cyan-500"></textarea>
+                    <p class="text-[11px] text-slate-500 mt-1">所有小步骤都勾完，这个任务就自动完成并发放奖励</p>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -547,7 +552,10 @@
                 <button onclick="closeModal('perkModal')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
 
-            <div class="grid grid-cols-3 gap-2 my-4" id="chestCostEditor"></div>
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 my-4">
+                <div class="text-xs font-semibold text-slate-300 mb-2">宝箱获得规则</div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs" id="chestRuleEditor"></div>
+            </div>
 
             <div class="text-[11px] text-slate-500 mb-2 leading-relaxed">
                 <strong class="text-slate-300">档位</strong>：小 → 铜宝箱，中 → 银宝箱，大 → 金宝箱。
@@ -737,6 +745,18 @@
             { id: "t8", title: "最低能耗保底模式（疲惫日备用）", desc: "15分钟文献浏览 + 10个单词 + 简单拉伸，状态不佳时确保不断签", statId: "STR", goalId: "", xp: 15, gold: 10, type: "LOW_POWER" }
         ];
 
+        // 每个模板任务的默认小步骤（只有文字，完成状态在当天的任务里）
+        const DEFAULT_STEPS = {
+            t1: ["运行 / 调试仿真模型", "处理数据或医学影像", "记录今日进展和遇到的问题"],
+            t2: ["精读 1 篇核心文献", "拆解模型逻辑或边界条件", "笔记沉淀进知识库"],
+            t3: ["墨墨背单词", "Speaking 口语练习", "Vlog"],
+            t4: ["学一组高频生活短句", "练习一个实用语法点"],
+            t5: ["刷 1 道算法题 / 优化一段脚本 / 学一个绘图技巧", "记下今天的收获"],
+            t6: ["热身 5 分钟", "有氧或力量训练 40 分钟", "拉伸放松"],
+            t8: ["浏览文献 15 分钟", "背 10 个单词", "简单拉伸"]
+        };
+        DEFAULT_TEMPLATE.forEach(t => { t.steps = (DEFAULT_STEPS[t.id] || []).map((text, i) => ({ id: `${t.id}s${i + 1}`, text })); });
+
         const DEFAULT_STATE = {
             playerName: "数字孪生学者",
             totalXp: 0,
@@ -747,7 +767,10 @@
             streakPrevValue: 0,
             currentFilter: "ALL",
             updatedAt: 0,
-            schema: 8,
+            schema: 10,
+            chestRules: { dailyPct: 100, weekDays: 6, monthDays: 20 }, // 宝箱达标规则
+            claims: { copper: {}, silver: {}, gold: {} },             // 已开启的宝箱：{ 日期/周一/月份: 开启日 }
+            dayTotals: {},                                              // 每天的日常任务总数（用来判断当天是否达标）
             stats: [
                 { id: "INT", code: "INT", name: "智力 · 数字孪生科研", xp: 0, color: "cyan" },
                 { id: "CHA", code: "CHA", name: "魅力 · 英西双语沟通", xp: 0, color: "purple" },
@@ -861,8 +884,10 @@
         function shiftDay(k, n) { const d = parseDay(k); d.setDate(d.getDate() + n); return fmtDate(d); }
         const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
-        const taskFields = (t) => ({ id: t.id, title: t.title, desc: t.desc || "", statId: t.statId, goalId: t.goalId || "", xp: Number(t.xp || 0), gold: Number(t.gold || 0), type: t.type || "DAILY" });
-        const logEntry = (t) => ({ tid: t.id, title: t.title, statId: t.statId, xp: Number(t.xp || 0), gold: Number(t.gold || 0) });
+        const taskFields = (t) => ({ id: t.id, title: t.title, desc: t.desc || "", statId: t.statId, goalId: t.goalId || "", xp: Number(t.xp || 0), gold: Number(t.gold || 0), type: t.type || "DAILY", steps: (t.steps || []).map(x => ({ id: x.id, text: x.text })) });
+        // 当天任务的小步骤带完成状态；keepDone=false 时全部重置为未完成
+        const daySteps = (t, keepDone) => (t.steps || []).map(x => ({ id: x.id, text: x.text, done: keepDone ? !!x.done : false }));
+        const logEntry = (t) => ({ tid: t.id, title: t.title, statId: t.statId, xp: Number(t.xp || 0), gold: Number(t.gold || 0), type: t.type || "DAILY" });
 
         // 旧版存档升级到 v4：生成模板、应用新的任务细节、宝箱改价、开始记录统计
         function migrate(s, raw) {
@@ -903,6 +928,20 @@
                 s.schema = 7;
             }
             if (ver < 8) s.schema = 8; // v8：新增餐饮、采购清单、清除记录（新字段由默认值补齐）
+            // v9：任务加上小步骤清单；默认任务带上建议的小步骤，已完成的任务步骤也标为完成
+            if (ver < 9) {
+                const mk = (id) => (DEFAULT_STEPS[id] || []).map((text, i) => ({ id: `${id}s${i + 1}`, text }));
+                s.template.forEach(t => { if (!Array.isArray(t.steps)) t.steps = mk(t.id); });
+                s.tasks.forEach(t => {
+                    if (!Array.isArray(t.steps)) {
+                        const src = s.template.find(x => x.id === t.id);
+                        t.steps = (src ? src.steps : mk(t.id)).map(x => ({ id: x.id, text: x.text, done: !!t.completed }));
+                    }
+                });
+                s.schema = Math.max(s.schema || 0, 9);
+            }
+            // v10：宝箱改为按工作量获得（每天达标→铜，一周 6 天→银，一月 20 天→金），不再用金币购买
+            if (ver < 10) s.schema = 10;
         }
 
         function migrateV4(s, raw) {
@@ -937,7 +976,7 @@
             const base = clone(DEFAULT_STATE);
             const s = { ...base, ...(obj || {}) };
             ["stats", "tasks", "rewards", "history", "goals", "chests", "perks", "template", "shopping"].forEach(k => { if (!Array.isArray(s[k])) s[k] = clone(base[k]); });
-            ["log", "repaired", "bonusGold", "meals", "shopFreq"].forEach(k => { if (!s[k] || typeof s[k] !== "object" || Array.isArray(s[k])) s[k] = {}; });
+            ["log", "repaired", "bonusGold", "meals", "shopFreq", "dayTotals"].forEach(k => { if (!s[k] || typeof s[k] !== "object" || Array.isArray(s[k])) s[k] = {}; });
             migrate(s, obj);
             if (!s.currentDate) s.currentDate = dayKey();
             s.goals.forEach(g => {
@@ -947,6 +986,9 @@
                 g.rewardGold = Number(g.rewardGold || 0);
             });
             s.tasks.forEach(t => { if (t.goalId === undefined) t.goalId = ""; });
+            s.chestRules = { dailyPct: 100, weekDays: 6, monthDays: 20, ...(s.chestRules || {}) };
+            const cl = s.claims && typeof s.claims === "object" ? s.claims : {};
+            s.claims = { copper: { ...(cl.copper || {}) }, silver: { ...(cl.silver || {}) }, gold: { ...(cl.gold || {}) } };
             s.updatedAt = Number(s.updatedAt || 0);
             return s;
         }
@@ -1050,8 +1092,12 @@
             Object.keys(src.log).forEach(k => {
                 if (k !== target.currentDate && !(k in target.log)) target.log[k] = src.log[k];
             });
-            ["repaired", "bonusGold", "meals"].forEach(f => Object.keys(src[f] || {}).forEach(k => {
+            ["repaired", "bonusGold", "meals", "dayTotals"].forEach(f => Object.keys(src[f] || {}).forEach(k => {
                 if (k !== target.currentDate && !(k in target[f])) target[f][k] = src[f][k];
+            }));
+            // 已开过的宝箱取并集，避免两台设备各开一次同一个宝箱
+            ["copper", "silver", "gold"].forEach(t => Object.keys((src.claims || {})[t] || {}).forEach(k => {
+                if (!(k in target.claims[t])) target.claims[t][k] = src.claims[t][k];
             }));
         }
 
@@ -1320,14 +1366,14 @@
             document.getElementById("todayEarnedGold").textContent = `+${todayGold}`;
             document.getElementById("todayProgressBar").style.width = total ? `${Math.round(done.length / total * 100)}%` : "0%";
 
-            const minReward = [...state.rewards, ...state.chests.map(c => ({ title: c.name, cost: c.cost }))].sort((a, b) => a.cost - b.cost)[0];
             const hintEl = document.getElementById("chestUnlockHint");
-            if (!minReward) { hintEl.textContent = ""; return; }
-            if (state.gold >= minReward.cost) {
-                hintEl.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles mr-1"></i>金币已足够兑换「${escapeHtml(minReward.title)}」！`;
-                hintEl.className = "text-xs text-amber-400 font-semibold";
+            const k = state.currentDate, need = dailyNeed(k), got = dailyDone(k);
+            const keys = availableClaims("copper").length + availableClaims("silver").length + availableClaims("gold").length;
+            if (qualifies(k)) {
+                hintEl.innerHTML = `<button onclick="switchTab('shop')" class="text-amber-300 font-semibold cursor-pointer">🥉 今日已达标${keys ? ` · 有 ${keys} 个宝箱可以开 →` : ""}</button>`;
+                hintEl.className = "text-xs";
             } else {
-                hintEl.innerHTML = `距「${escapeHtml(minReward.title)}」还差 <span class="font-mono font-bold text-slate-200">${minReward.cost - state.gold}</span> 金币`;
+                hintEl.innerHTML = `🥉 今日铜宝箱：日常任务 <span class="font-mono font-bold text-slate-200">${got}/${need}</span>，还差 <span class="font-mono font-bold text-slate-200">${Math.max(0, need - got)}</span> 项${keys ? ` · <button onclick="switchTab('shop')" class="text-amber-300 cursor-pointer">有 ${keys} 个宝箱可以开 →</button>` : ""}`;
                 hintEl.className = "text-xs text-slate-400";
             }
         }
@@ -1468,12 +1514,21 @@
                             <button onclick="toggleTask('${task.id}', event)" class="mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center border transition shrink-0 cursor-pointer ${task.completed ? "bg-emerald-500 border-emerald-400 text-slate-950" : "bg-slate-950 border-slate-600 hover:border-cyan-400 text-transparent"}">
                                 <i class="fa-solid fa-check text-xs"></i>
                             </button>
-                            <div class="flex-1 min-w-0 cursor-pointer" onclick="toggleTask('${task.id}', event)">
+                            <div class="flex-1 min-w-0 ${(task.steps || []).length ? "" : "cursor-pointer"}" ${(task.steps || []).length ? "" : `onclick="toggleTask('${task.id}', event)"`}>
                                 <h3 class="font-semibold text-sm mb-1 ${task.completed ? "line-through text-slate-500" : "text-slate-100"}">${escapeHtml(task.title)}</h3>
                                 ${task.desc ? `<p class="text-xs text-slate-400 leading-relaxed mb-2">${escapeHtml(task.desc)}</p>` : ""}
+                                ${(task.steps || []).length ? `
+                                    <div class="mb-2.5 space-y-0.5">
+                                        ${task.steps.map(x => `
+                                            <button onclick="toggleStep('${task.id}', '${x.id}', event)" class="w-full flex items-center gap-2 text-left px-1.5 py-1 rounded-md hover:bg-slate-800/70 cursor-pointer">
+                                                <span class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ${x.done ? "bg-cyan-500 border-cyan-400 text-slate-950" : "border-slate-600 text-transparent"}"><i class="fa-solid fa-check text-[8px]"></i></span>
+                                                <span class="text-xs ${x.done ? "line-through text-slate-500" : "text-slate-300"}">${escapeHtml(x.text)}</span>
+                                            </button>`).join("")}
+                                    </div>` : ""}
                                 <div class="flex flex-wrap items-center gap-1.5 text-[10px]">
                                     <span class="px-1.5 py-0.5 rounded font-mono font-bold ${style.badge} border ${style.border}">${escapeHtml(stat.code)}</span>
                                     <span class="px-1.5 py-0.5 rounded font-medium border ${tBadge.cls}">${tBadge.label}</span>
+                                    ${(task.steps || []).length ? `<span class="px-1.5 py-0.5 rounded font-mono border ${task.completed ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" : "bg-cyan-500/10 text-cyan-300 border-cyan-500/30"}">☑ ${task.steps.filter(x => x.done).length}/${task.steps.length}</span>` : ""}
                                     ${goal ? `<span class="px-1.5 py-0.5 rounded font-medium border bg-purple-500/10 text-purple-300 border-purple-500/30 max-w-[12rem] truncate"><i class="fa-solid fa-mountain mr-0.5"></i>${escapeHtml(goal.title)}</span>` : ""}
                                     ${task.carriedFrom ? `<span class="px-1.5 py-0.5 rounded font-medium border bg-sky-500/10 text-sky-300 border-sky-500/30">⏩ ${shortDay(task.carriedFrom)} 顺延</span>` : ""}
                                     ${task.carry && !task.completed ? `<span onclick="event.stopPropagation(); toggleCarry('${task.id}')" class="px-1.5 py-0.5 rounded font-medium border bg-amber-500/15 text-amber-300 border-amber-500/40 cursor-pointer" title="点击取消">⏭ 明天继续 ✕</span>` : ""}
@@ -1636,7 +1691,7 @@
             c.innerHTML = state.history.map(item => `
                 <div class="flex items-center justify-between text-xs bg-slate-900/60 border border-slate-800/80 rounded-lg px-3 py-2">
                     <div class="flex items-center gap-2 min-w-0"><span>${escapeHtml(item.icon || "🎁")}</span><span class="text-slate-200 truncate font-medium">${escapeHtml(item.title)}</span></div>
-                    <div class="flex items-center gap-2 shrink-0 text-[11px] font-mono"><span class="text-amber-400">-${item.cost}G</span><span class="text-slate-500">${escapeHtml(item.time)}</span></div>
+                    <div class="flex items-center gap-2 shrink-0 text-[11px] font-mono"><span class="text-amber-400">${Number(item.cost) ? `-${item.cost}G` : "🔑"}</span><span class="text-slate-500">${escapeHtml(item.time)}</span></div>
                 </div>`).join("");
         }
 
@@ -1677,21 +1732,26 @@
             renderLogStats();
         }
 
-        function repairCost() { return (state.chests.find(c => c.tier === "small") || { cost: 50 }).cost; }
+        const REPAIR_GOLD = 50;
+        function repairCost() { return REPAIR_GOLD; }
 
         function canRepair(k) {
             return k < state.currentDate && k >= shiftDay(state.currentDate, -30) && !hasCheckin(k);
         }
 
+        // 补签：优先用掉 1 个铜宝箱；没有铜宝箱时用 50 金币
         function repairDay(k) {
             if (!canRepair(k)) return;
-            const cost = repairCost();
-            if (state.gold < cost) { showToast(`金币不足，补签需要 ${cost} 金币`, "error"); return; }
+            const copper = availableClaims("copper");
+            const cost = copper.length ? 0 : repairCost();
+            if (cost && state.gold < cost) { showToast(`没有铜宝箱，金币也不足（补签需要 ${cost} 金币）`, "error"); return; }
             const d = parseDay(k);
-            showConfirm(`补签 ${d.getMonth() + 1}/${d.getDate()}？`, `消耗一个铜宝箱的金币（${cost}）把这一天记为已打卡，连续打卡天数会重新连上。`, () => {
-                state.gold -= cost;
+            const how = copper.length ? "1 个铜宝箱" : `${cost} 金币`;
+            showConfirm(`补签 ${d.getMonth() + 1}/${d.getDate()}？`, `消耗 ${how}，把这一天记为已打卡，连续打卡天数会重新连上。`, () => {
+                if (copper.length) state.claims.copper[copper[0]] = "repair:" + k;
+                else state.gold -= cost;
                 state.repaired[k] = "chest";
-                state.history.unshift({ icon: "🩹", title: `补签 ${d.getMonth() + 1}/${d.getDate()}`, cost, time: nowStamp(), day: state.currentDate });
+                state.history.unshift({ icon: "🩹", title: `补签 ${d.getMonth() + 1}/${d.getDate()}（${copper.length ? "铜宝箱" : "金币"}）`, cost, time: nowStamp(), day: state.currentDate });
                 saveState(); renderAll();
                 showToast(`🩹 补签成功！连续打卡 ${displayStreak()} 天`, "levelup");
             });
@@ -1719,14 +1779,42 @@
             if (!state.bonusGold[k]) delete state.bonusGold[k];
         }
 
+        // 点任务前面的大勾：有小步骤时，一次性全部勾上 / 全部取消
         function toggleTask(taskId, event) {
             const task = state.tasks.find(t => t.id === taskId);
             if (!task) return;
+            const target = !task.completed;
+            (task.steps || []).forEach(x => { x.done = target; });
+            setTaskCompleted(task, target, event);
+            saveState();
+            renderAll();
+        }
+
+        // 勾一个小步骤；全部勾完 → 任务自动完成；已完成的任务取消任一步骤 → 任务变回未完成
+        function toggleStep(taskId, stepId, event) {
+            const task = state.tasks.find(t => t.id === taskId);
+            const step = task && (task.steps || []).find(x => x.id === stepId);
+            if (!step) return;
+            step.done = !step.done;
+            const all = task.steps.every(x => x.done);
+            if (all && !task.completed) {
+                setTaskCompleted(task, true, event);
+                showToast(`✅ 「${task.title}」的小步骤全部完成！`, "success");
+            } else if (!all && task.completed) {
+                setTaskCompleted(task, false);
+            }
+            saveState();
+            renderAll();
+        }
+
+        // 统一处理任务完成 / 取消完成：发放或扣回奖励、目标推进、当天统计
+        function setTaskCompleted(task, completed, event) {
+            if (!!task.completed === completed) return;
+            const before = chestProgress();
             const key = state.currentDate;
             const dayLog = state.log[key] || [];
-            const before = dayLog.length;
 
-            task.completed = !task.completed;
+            task.completed = completed;
             const sign = task.completed ? 1 : -1;
             grant(task.statId, sign * Number(task.xp || 0), sign * Number(task.gold || 0));
 
@@ -1738,9 +1826,15 @@
             if (task.completed) next.push(logEntry(task));
             if (next.length) state.log[key] = next; else delete state.log[key];
 
+            state.dayTotals[key] = liveDailyTotal();
             if (task.completed && event) spawnFloatingText(event.clientX, event.clientY, `+${task.xp} XP  +${task.gold} 金币`);
-            saveState();
-            renderAll();
+
+            // 刚刚达标 → 提示获得宝箱
+            const after = chestProgress();
+            const R = state.chestRules;
+            if (!before.todayOk && after.todayOk) setTimeout(() => showToast("🥉 今日工作量达标！获得 1 个铜宝箱，去商店开启吧", "levelup"), 300);
+            if (before.week < R.weekDays && after.week >= R.weekDays) setTimeout(() => showToast(`🥈 本周已达标 ${after.week} 天！获得 1 个银宝箱`, "levelup"), 900);
+            if (before.month < R.monthDays && after.month >= R.monthDays) setTimeout(() => showToast(`🥇 本月已达标 ${after.month} 天！获得 1 个金宝箱`, "levelup"), 1500);
         }
 
         function shortDay(k) { const d = parseDay(k); return `${d.getMonth() + 1}/${d.getDate()}`; }
@@ -1760,12 +1854,14 @@
             if (state.currentDate === today) return false;
             // 标记了「顺延」且没完成的任务，带到新的一天（放在最前面）
             const from = state.currentDate;
+            state.dayTotals[from] = liveDailyTotal();
             const carried = state.tasks.filter(t => t.carry && !t.completed).map(t => {
                 const inTpl = state.template.some(x => x.id === t.id);
                 // 模板任务明天本来就会出现，所以顺延的是额外的一份，例如「文献 1 篇」→ 明天要做 2 篇
-                return { ...taskFields(t), id: inTpl ? uid("carry") : t.id, completed: false, carriedFrom: t.carriedFrom || from };
+                // 顺延时保留已经勾掉的小步骤，第二天接着做
+                return { ...taskFields(t), steps: daySteps(t, true), id: inTpl ? uid("carry") : t.id, completed: false, carriedFrom: t.carriedFrom || from };
             });
-            state.tasks = [...carried, ...state.template.map(t => ({ ...taskFields(t), completed: false }))];
+            state.tasks = [...carried, ...state.template.map(t => ({ ...taskFields(t), steps: daySteps(t, false), completed: false }))];
             // 采购清单：已经买到的移走，没买的留到新的一天
             state.shopping = state.shopping.filter(i => !i.done);
             state.currentDate = today;
@@ -1817,6 +1913,7 @@
             document.getElementById("taskIdInput").value = task ? task.id : "";
             document.getElementById("taskTitleInput").value = task ? task.title : "";
             document.getElementById("taskDescInput").value = task ? (task.desc || "") : "";
+            document.getElementById("taskStepsInput").value = task ? (task.steps || []).map(x => x.text).join("\n") : "";
             document.getElementById("taskTypeInput").value = task ? task.type : "DAILY";
             document.getElementById("taskXpInput").value = task ? task.xp : 25;
             document.getElementById("taskGoldInput").value = task ? task.gold : 15;
@@ -1840,24 +1937,39 @@
                 gold: Math.max(0, parseInt(document.getElementById("taskGoldInput").value, 10) || 0)
             };
             if (!data.title) return;
+            const stepTexts = document.getElementById("taskStepsInput").value.split("\n").map(x => x.trim()).filter(Boolean);
+            // 同名的小步骤沿用原来的 id 和完成状态
+            const buildSteps = (prev, withDone) => {
+                const old = new Map((prev || []).map(x => [x.text, x]));
+                return stepTexts.map(text => {
+                    const o = old.get(text);
+                    const st = { id: o ? o.id : uid("s"), text };
+                    if (withDone) st.done = o ? !!o.done : false;
+                    return st;
+                });
+            };
+            const applyToday = (t) => {
+                Object.assign(t, data, { steps: buildSteps(t.steps, true) });
+                // 改完后如果剩下的小步骤都已完成，就直接算任务完成
+                if (t.steps.length && t.steps.every(x => x.done) && !t.completed) setTaskCompleted(t, true);
+            };
 
             if (id) {
                 const today = state.tasks.find(t => t.id === id);
                 const tpl = state.template.find(t => t.id === id);
                 if (scope === "template") {
-                    if (tpl) Object.assign(tpl, data);
-                    else state.template.push({ id, ...data });
-                    if (today && !today.completed) Object.assign(today, data);
-                    else if (today && !taskModalFromTemplate) Object.assign(today, data);
+                    if (tpl) Object.assign(tpl, data, { steps: buildSteps(tpl.steps, false) });
+                    else state.template.push({ id, ...data, steps: buildSteps(today && today.steps, false) });
+                    if (today && (!today.completed || !taskModalFromTemplate)) applyToday(today);
                     showToast("已更新（今天 + 以后每天）", "success");
                 } else {
-                    if (today) Object.assign(today, data);
+                    if (today) applyToday(today);
                     showToast("已更新（只限今天）", "success");
                 }
             } else {
                 const nid = uid("task");
-                if (scope === "template") state.template.push({ id: nid, ...data });
-                state.tasks.push({ id: nid, ...data, completed: false });
+                if (scope === "template") state.template.push({ id: nid, ...data, steps: buildSteps([], false) });
+                state.tasks.push({ id: nid, ...data, steps: buildSteps([], true), completed: false });
                 showToast(scope === "template" ? "已加入每日模板，今天也已添加" : "已添加今日临时任务", "success");
             }
             saveState();
@@ -1910,6 +2022,7 @@
                                 <span class="text-slate-500">${typeLabel[t.type] || "日常"}</span>
                                 <span class="font-mono text-cyan-400">+${t.xp} XP</span>
                                 <span class="font-mono text-amber-400">+${t.gold} 金</span>
+                                ${(t.steps || []).length ? `<span class="text-slate-500">· ${t.steps.length} 个小步骤</span>` : ""}
                             </div>
                         </div>
                         <button onclick="openTaskModal('${t.id}', true)" class="p-1.5 text-slate-500 hover:text-cyan-400 cursor-pointer" title="编辑"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
@@ -2078,11 +2191,13 @@
             state.history = [];
             state.shopping = state.shopping.filter(i => !i.done);
             state.streak = 0; state.streakLastDay = ""; state.streakPrevDay = ""; state.streakPrevValue = 0;
-            state.tasks.forEach(t => { t.completed = false; t.carry = false; delete t.carriedFrom; });
+            state.tasks.forEach(t => { t.completed = false; t.carry = false; delete t.carriedFrom; (t.steps || []).forEach(x => { x.done = false; }); });
             state.goals.forEach(g => {
                 g.milestones.forEach(m => { m.done = false; });
                 g.checkins = 0; g.completed = false; g.completedAt = "";
             });
+            state.claims = { copper: {}, silver: {}, gold: {} };
+            state.dayTotals = {};
             state.resetId = uid("reset");
             state.currentDate = dayKey();
             statsSelected = null; statsMonth = null;
@@ -2173,7 +2288,7 @@
                     const sel = k === statsSelected;
                     const future = k > today;
                     cells += `<button onclick="selectStatsDay('${k}')" class="min-h-[64px] rounded-lg px-0.5 py-1 flex flex-col items-center justify-start gap-0.5 cursor-pointer border ${sel ? "border-cyan-400" : k === today ? "border-emerald-400/70" : rep ? "border-sky-500/50 border-dashed" : "border-transparent"} ${future ? "opacity-30" : ""}" style="background:${heatBg(mo.n)}">
-                        <span class="text-[11px] leading-none ${mo.n ? "text-white font-semibold" : "text-slate-500"}">${d}${rep === "chest" ? "🩹" : ""}</span>
+                        <span class="text-[11px] leading-none ${mo.n ? "text-white font-semibold" : "text-slate-500"}">${d}${rep === "chest" ? "🩹" : ""}${qualifies(k) ? `<span class="text-[9px]">🥉</span>` : ""}</span>
                         ${mo.n ? `<span class="font-mono text-[9px] leading-none text-emerald-100">✓${mo.n}</span>` : ""}
                         ${mo.earn ? `<span class="font-mono text-[9px] leading-none text-amber-300">+${mo.earn}</span>` : ""}
                         ${mo.spend ? `<span class="font-mono text-[9px] leading-none text-rose-300">-${mo.spend}</span>` : ""}
@@ -2188,10 +2303,14 @@
                 let repairBlock = "";
                 if (rep === "chest") repairBlock = `<p class="text-xs text-sky-300 mt-3">🩹 这一天已用铜宝箱补签，计入连续打卡</p>`;
                 else if (rep === "legacy" && !list.length) repairBlock = `<p class="text-xs text-slate-400 mt-3">📜 旧版记录的打卡日，计入连续打卡</p>`;
-                else if (canRepair(statsSelected)) repairBlock = `
-                    <button onclick="repairDay('${statsSelected}')" class="mt-3 w-full py-2 rounded-xl ${state.gold >= repairCost() ? "bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/40 cursor-pointer" : "bg-slate-800 text-slate-500 cursor-not-allowed"} text-xs font-semibold">
-                        🩹 用铜宝箱补签这一天（${repairCost()} 金币）
+                else if (canRepair(statsSelected)) {
+                    const hasCopper = availableClaims("copper").length > 0;
+                    const can = hasCopper || state.gold >= repairCost();
+                    repairBlock = `
+                    <button onclick="repairDay('${statsSelected}')" class="mt-3 w-full py-2 rounded-xl ${can ? "bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/40 cursor-pointer" : "bg-slate-800 text-slate-500 cursor-not-allowed"} text-xs font-semibold">
+                        🩹 补签这一天（${hasCopper ? "用 1 个铜宝箱" : `没有铜宝箱，用 ${repairCost()} 金币`}）
                     </button>`;
+                }
 
                 dayEl.innerHTML = `
                     <div class="flex items-center justify-between mb-3">
@@ -2490,25 +2609,82 @@
 
         let currentDraw = null;
 
+        // ---------- 达标判断：当天「日常」任务完成比例 ≥ 达标线 ----------
+        const TIER_CLAIM = { small: "copper", medium: "silver", large: "gold" };
+        function liveDailyTotal() { return state.tasks.filter(t => t.type === "DAILY" && !t.carriedFrom).length; }
+        function dailyNeed(k) {
+            const total = k === state.currentDate ? liveDailyTotal() : (state.dayTotals[k] || state.template.filter(t => t.type === "DAILY").length);
+            return Math.max(1, Math.ceil(total * state.chestRules.dailyPct / 100 - 1e-9));
+        }
+        function dailyDone(k) {
+            const tplType = new Map(state.template.map(t => [t.id, t.type]));
+            const seen = new Set();
+            (state.log[k] || []).forEach(e => {
+                const type = e.type || tplType.get(e.tid) || "DAILY";
+                if (type === "DAILY" && !String(e.tid).startsWith("carry")) seen.add(e.tid);
+            });
+            return seen.size;
+        }
+        function qualifies(k) { return !!state.log[k] && dailyDone(k) >= dailyNeed(k); }
+        function weekStart(k) { const d = parseDay(k); return shiftDay(k, -((d.getDay() + 6) % 7)); }
+        function weekCount(monday) { let n = 0; for (let i = 0; i < 7; i++) if (qualifies(shiftDay(monday, i))) n++; return n; }
+        function monthCount(ym) { return Object.keys(state.log).filter(k => k.startsWith(ym) && qualifies(k)).length; }
+
+        function chestProgress() {
+            const k = state.currentDate;
+            return { todayOk: qualifies(k), week: weekCount(weekStart(k)), month: monthCount(k.slice(0, 7)) };
+        }
+
+        // 还没开的宝箱：铜=每个达标日，银=达标 ≥ N 天的周，金=达标 ≥ M 天的月
+        function availableClaims(tier) {
+            const R = state.chestRules, done = state.claims[tier];
+            const qDays = Object.keys(state.log).filter(qualifies).sort();
+            let periods;
+            if (tier === "copper") periods = qDays;
+            else if (tier === "silver") periods = [...new Set(qDays.map(weekStart))].filter(w => weekCount(w) >= R.weekDays);
+            else periods = [...new Set(qDays.map(k => k.slice(0, 7)))].filter(m => monthCount(m) >= R.monthDays);
+            return periods.filter(p => !(p in done)).sort();
+        }
+
+        function claimLabel(tier, p) {
+            if (tier === "copper") return shortDay(p);
+            if (tier === "silver") return `${shortDay(p)} 那周`;
+            const [y, m] = p.split("-").map(Number); return `${m} 月`;
+        }
+
         function renderChests() {
             const ctx = chestContext();
             document.getElementById("chestContext").innerHTML =
                 ctx.reasons.map(r => `<span class="text-[11px] px-2 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-300">${escapeHtml(r)}</span>`).join("") +
                 `<span class="text-[11px] px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300">✨ 暴击率 ${Math.round(ctx.crit * 100)}%</span>`;
 
-            // 按模板里日常任务的金币、约 75% 完成率估算每天收入
-            const dailyGold = state.template.filter(t => t.type === "DAILY").reduce((a, t) => a + Number(t.gold || 0), 0) * 0.75;
+            const R = state.chestRules, k = state.currentDate, pr = chestProgress();
+            const ym = k.slice(0, 7), [yy, mm] = ym.split("-").map(Number);
+            const progress = {
+                copper: { cur: dailyDone(k), need: dailyNeed(k), text: `今天日常 ${dailyDone(k)}/${dailyNeed(k)} 项` },
+                silver: { cur: pr.week, need: R.weekDays, text: `本周达标 ${pr.week}/${R.weekDays} 天` },
+                gold: { cur: pr.month, need: R.monthDays, text: `${mm} 月达标 ${pr.month}/${R.monthDays} 天` }
+            };
+            // 当前这一期（今天 / 本周 / 本月）是否已经开过
+            const curClaimed = { copper: k in state.claims.copper, silver: weekStart(k) in state.claims.silver, gold: ym in state.claims.gold };
             document.getElementById("chestGrid").innerHTML = state.chests.map((c, i) => {
-                const ok = state.gold >= c.cost;
-                const days = dailyGold ? Math.max(1, Math.round(c.cost / dailyGold)) : null;
+                const tier = TIER_CLAIM[c.tier];
+                const avail = availableClaims(tier);
+                const ok = avail.length > 0;
+                const pg = progress[tier];
+                const pct = Math.min(100, Math.round(pg.cur / pg.need * 100));
                 const n = state.perks.filter(p => p.tier === c.tier).length;
                 return `
-                    <button onclick="openChest(${i})" ${ok ? "" : "disabled"} class="rounded-2xl p-3 sm:p-4 border text-center transition ${ok ? "bg-slate-900/90 border-amber-500/40 hover:border-amber-400 hover:-translate-y-0.5 cursor-pointer" : "bg-slate-900/50 border-slate-800 opacity-60 cursor-not-allowed"}">
-                        <div class="text-3xl sm:text-4xl mb-1">${c.icon}</div>
+                    <div class="rounded-2xl p-3 sm:p-4 border text-center ${ok ? "bg-slate-900/90 border-amber-500/50" : "bg-slate-900/50 border-slate-800"}">
+                        <div class="text-3xl sm:text-4xl mb-1 ${ok ? "" : "opacity-50 grayscale"}">${c.icon}</div>
                         <div class="font-bold text-sm text-white">${escapeHtml(c.name)}</div>
-                        <div class="font-mono text-xs text-amber-400 mt-0.5"><i class="fa-solid fa-coins mr-0.5"></i>${c.cost}</div>
-                        <div class="text-[10px] text-slate-500 mt-1">${days ? `约 ${days} 天收入 · ` : ""}${n} 种可能</div>
-                    </button>`;
+                        <div class="text-[10px] text-slate-400 mt-1 leading-tight">${pg.text}</div>
+                        <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1.5"><div class="h-full ${pct >= 100 ? "bg-amber-400" : "bg-cyan-500"} rounded-full" style="width:${pct}%"></div></div>
+                        <button onclick="openChest(${i})" ${ok ? "" : "disabled"} class="mt-2.5 w-full py-1.5 rounded-lg text-xs font-bold ${ok ? "bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 cursor-pointer" : "bg-slate-800 text-slate-500 cursor-not-allowed"}">
+                            ${ok ? `开启${avail.length > 1 ? ` ×${avail.length}` : ""}` : (curClaimed[tier] ? "✓ 本期已开启" : "未达标")}
+                        </button>
+                        <div class="text-[10px] text-slate-500 mt-1">${n} 种可能</div>
+                    </div>`;
             }).join("");
         }
 
@@ -2516,7 +2692,10 @@
             const chest = state.chests[i];
             if (!chest) return;
             if (!state.perks.length) { showToast("喜好池是空的，先添加几件喜欢的事吧", "error"); openPerkModal(); return; }
-            if (state.gold < chest.cost) { showToast("金币不足，继续完成任务吧！", "error"); return; }
+            const claimTier = TIER_CLAIM[chest.tier];
+            const avail = availableClaims(claimTier);
+            if (!avail.length) { showToast("还没达标，继续完成任务吧！", "error"); return; }
+            const period = avail[0]; // 先开最早获得的那一个
 
             const ctx = chestContext();
             let tier = chest.tier;
@@ -2524,18 +2703,18 @@
             if (Math.random() < ctx.crit) {
                 const next = TIER_ORDER[TIER_ORDER.indexOf(tier) + 1];
                 if (next && state.perks.some(p => p.tier === next)) { tier = next; rarity = "upgrade"; }
-                else rarity = "refund";
+                else rarity = "bonus";
             }
             const perk = drawPerk(tier, ctx);
             if (!perk) return;
 
-            state.gold -= chest.cost;
-            const refund = rarity === "refund" ? Math.round(chest.cost / 2) : 0;
-            state.gold += refund;
+            state.claims[claimTier][period] = state.currentDate;
+            const bonus = rarity === "bonus" ? 200 : 0; // 金宝箱暴击：额外送 200 金币
+            if (bonus) { state.gold += bonus; addBonusGold(bonus); }
             saveState();
             renderAll();
 
-            currentDraw = { chest, tier, rarity, refund, perk, ctx, rerolled: false };
+            currentDraw = { chest, tier, rarity, refund: bonus, perk, ctx, rerolled: false, label: claimLabel(claimTier, period) };
 
             document.getElementById("chestOpeningIcon").textContent = chest.icon;
             const icon = document.getElementById("chestOpeningIcon");
@@ -2553,10 +2732,10 @@
             const rarityEl = document.getElementById("chestRarity");
             if (d.rarity === "upgrade") {
                 rarityEl.innerHTML = `<span class="px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 text-slate-950">✨ 暴击！升级为${d.tier === "large" ? "金宝箱" : "银宝箱"}奖励</span>`;
-            } else if (d.rarity === "refund") {
-                rarityEl.innerHTML = `<span class="px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 text-slate-950">✨ 暴击！返还 ${d.refund} 金币</span>`;
+            } else if (d.rarity === "bonus") {
+                rarityEl.innerHTML = `<span class="px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 text-slate-950">✨ 暴击！额外获得 ${d.refund} 金币</span>`;
             } else {
-                rarityEl.innerHTML = `<span class="text-slate-500">${escapeHtml(d.chest.name)}</span>`;
+                rarityEl.innerHTML = `<span class="text-slate-500">${escapeHtml(d.chest.name)} · ${escapeHtml(d.label || "")}</span>`;
             }
             document.getElementById("chestResultIcon").textContent = cat.icon;
             document.getElementById("chestResultCat").innerHTML = `<span class="text-[11px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30">${cat.label} · ${PERK_WHEN[d.perk.when] || "随时"}</span>`;
@@ -2590,9 +2769,9 @@
             const n = new Date(), pad = (x) => String(x).padStart(2, "0");
             state.history.unshift({
                 icon: (PERK_CATS[d.perk.cat] || {}).icon || d.chest.icon,
-                title: `${d.chest.name}：${d.perk.text}`,
+                title: `${d.chest.name}（${d.label}）：${d.perk.text}`,
                 perkText: d.perk.text,
-                cost: d.chest.cost - d.refund,
+                cost: 0,
                 day: state.currentDate,
                 time: `${pad(n.getMonth() + 1)}-${pad(n.getDate())} ${pad(n.getHours())}:${pad(n.getMinutes())}`
             });
@@ -2615,11 +2794,17 @@
         }
 
         function renderPerkEditor() {
-            document.getElementById("chestCostEditor").innerHTML = state.chests.map((c, i) => `
-                <label class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 flex items-center gap-2">
-                    <span class="text-lg">${c.icon}</span>
-                    <input type="number" min="1" max="100000" value="${c.cost}" onchange="updateChestCost(${i}, this.value)" class="w-full min-w-0 bg-transparent text-sm font-mono text-amber-400 focus:outline-none">
-                </label>`).join("");
+            const R = state.chestRules;
+            const field = (icon, pre, key, val, min, max, post) => `
+                <label class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-2 flex items-center gap-1.5">
+                    <span>${icon}</span><span class="text-slate-400">${pre}</span>
+                    <input type="number" min="${min}" max="${max}" value="${val}" onchange="updateChestRule('${key}', this.value, ${min}, ${max})" class="w-12 bg-transparent font-mono text-amber-400 focus:outline-none text-center">
+                    <span class="text-slate-400">${post}</span>
+                </label>`;
+            document.getElementById("chestRuleEditor").innerHTML =
+                field("🥉", "日常完成", "dailyPct", R.dailyPct, 50, 100, "%") +
+                field("🥈", "一周达标", "weekDays", R.weekDays, 1, 7, "天") +
+                field("🥇", "一月达标", "monthDays", R.monthDays, 1, 31, "天");
 
             const list = TIER_ORDER.flatMap(t => state.perks.filter(p => p.tier === t));
             document.getElementById("perkEditList").innerHTML = list.length ? list.map(p => `
@@ -2632,6 +2817,13 @@
                         <button onclick="removePerk('${p.id}')" class="p-1.5 text-slate-500 hover:text-rose-400 cursor-pointer" title="删除"><i class="fa-solid fa-trash-can text-xs"></i></button>
                     </div>
                 </div>`).join("") : `<p class="text-xs text-slate-500 text-center py-4">喜好池还是空的</p>`;
+        }
+
+        function updateChestRule(key, v, min, max) {
+            const n = parseInt(v, 10);
+            if (!n) return;
+            state.chestRules[key] = Math.min(max, Math.max(min, n));
+            saveState(); renderAll(); renderPerkEditor();
         }
 
         function updateChestCost(i, v) {
@@ -2806,7 +2998,7 @@
 
         // ==================== 新版本检测 ====================
         // 每次上传新的 index.html 时把这个数字 +1，已打开的页面会提示刷新
-        const APP_VERSION = "9";
+        const APP_VERSION = "11";
         async function checkForUpdate() {
             if (!/^https?:/.test(location.protocol)) return;
             try {
