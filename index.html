@@ -70,7 +70,7 @@
                 </div>
                 <h1 class="font-bold text-base sm:text-lg tracking-tight text-white truncate">
                     数字孪生学者 RPG
-                    <span class="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 ml-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 align-middle">v11</span>
+                    <span class="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 ml-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 align-middle">v12</span>
                 </h1>
             </div>
 
@@ -588,11 +588,22 @@
                 <div id="chestResultIcon" class="text-6xl mb-3">🎁</div>
                 <div id="chestResultCat" class="mb-2"></div>
                 <h3 id="chestResultText" class="font-bold text-lg text-white leading-snug mb-4"></h3>
-                <div id="chestResultReasons" class="text-[11px] text-slate-400 space-y-1 mb-5"></div>
-                <div class="flex gap-2.5">
-                    <button id="chestRerollBtn" onclick="rerollChest()" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium cursor-pointer"><i class="fa-solid fa-shuffle mr-1"></i>换一个 (免费 1 次)</button>
-                    <button onclick="acceptChest()" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold text-xs cursor-pointer">收下奖励</button>
+                <!-- 改写模式 -->
+                <div id="chestEditBox" class="hidden mb-4 text-left">
+                    <textarea id="chestEditInput" rows="2" maxlength="60" oninput="currentDraw && (currentDraw.customText = this.value)" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-amber-500/50 text-sm text-white focus:outline-none focus:border-amber-400"></textarea>
+                    <label class="flex items-center gap-2 text-[11px] text-slate-400 mt-1.5 cursor-pointer">
+                        <input type="checkbox" id="chestEditSave" class="accent-amber-500"> 同时加入喜好池，以后也能抽到
+                    </label>
                 </div>
+                <!-- 自己选 -->
+                <div id="chestPickBox" class="hidden mb-4 max-h-48 overflow-y-auto space-y-1 text-left"></div>
+                <div id="chestResultReasons" class="text-[11px] text-slate-400 space-y-1 mb-5"></div>
+                <div class="grid grid-cols-3 gap-2 mb-2.5">
+                    <button id="chestRerollBtn" onclick="rerollChest()" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium cursor-pointer"><i class="fa-solid fa-shuffle mr-1"></i>换一个</button>
+                    <button id="chestPickBtn" onclick="toggleChestPick()" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium cursor-pointer"><i class="fa-solid fa-hand-pointer mr-1"></i>自己选</button>
+                    <button id="chestEditBtn" onclick="toggleChestEdit()" class="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium cursor-pointer"><i class="fa-solid fa-pen mr-1"></i>改写</button>
+                </div>
+                <button onclick="acceptChest()" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-bold text-xs cursor-pointer">收下奖励</button>
             </div>
         </div>
     </div>
@@ -2739,15 +2750,30 @@
             }
             document.getElementById("chestResultIcon").textContent = cat.icon;
             document.getElementById("chestResultCat").innerHTML = `<span class="text-[11px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30">${cat.label} · ${PERK_WHEN[d.perk.when] || "随时"}</span>`;
-            document.getElementById("chestResultText").textContent = d.perk.text;
+            const editing = !!d.editing, picking = !!d.picking;
+            document.getElementById("chestResultText").textContent = (d.customText || "").trim() || d.perk.text;
+            document.getElementById("chestResultText").classList.toggle("hidden", editing);
+            document.getElementById("chestEditBox").classList.toggle("hidden", !editing);
+            const pickBox = document.getElementById("chestPickBox");
+            pickBox.classList.toggle("hidden", !picking);
+            if (picking) {
+                const pool = state.perks.filter(p => p.tier === d.tier);
+                pickBox.innerHTML = `<div class="text-[11px] text-slate-500 mb-1">从「${PERK_TIERS[d.tier]}」档里挑一个：</div>` + pool.map(p => `
+                    <button onclick="pickChestPerk('${p.id}')" class="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer border ${p.id === d.perk.id && !d.customText ? "bg-amber-500/15 border-amber-500/40 text-amber-200" : "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-600"}">
+                        <span>${(PERK_CATS[p.cat] || {}).icon || "🎁"}</span><span class="flex-1 text-left">${escapeHtml(p.text)}</span>
+                    </button>`).join("");
+            }
+            const setBtn = (id, on) => { document.getElementById(id).className = `py-2 rounded-xl text-[11px] font-medium cursor-pointer ${on ? "bg-amber-500/20 text-amber-300 border border-amber-500/40" : "bg-slate-800 hover:bg-slate-700 text-slate-300"}`; };
+            setBtn("chestPickBtn", picking);
+            setBtn("chestEditBtn", editing);
             const rs = d.ctx.reasons.filter(r => !r.startsWith("📜"));
             document.getElementById("chestResultReasons").innerHTML = rs.length
                 ? `<div class="text-slate-500 mb-1">这次抽奖参考了：</div>` + rs.map(r => `<div>${escapeHtml(r)}</div>`).join("")
                 : "";
             const rb = document.getElementById("chestRerollBtn");
             rb.disabled = d.rerolled;
-            rb.className = `flex-1 py-2.5 rounded-xl text-xs font-medium ${d.rerolled ? "bg-slate-800/50 text-slate-600 cursor-not-allowed" : "bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"}`;
-            rb.innerHTML = d.rerolled ? "已换过一次" : `<i class="fa-solid fa-shuffle mr-1"></i>换一个 (免费 1 次)`;
+            rb.className = `py-2 rounded-xl text-[11px] font-medium ${d.rerolled ? "bg-slate-800/50 text-slate-600 cursor-not-allowed" : "bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"}`;
+            rb.innerHTML = d.rerolled ? "已随机换过" : `<i class="fa-solid fa-shuffle mr-1"></i>换一个`;
             document.getElementById("chestOpening").classList.add("hidden");
             const res = document.getElementById("chestResult");
             res.classList.remove("hidden", "pop-in"); void res.offsetWidth; res.classList.add("pop-in");
@@ -2760,6 +2786,34 @@
             if (!p) { showToast("这个档位只有一种奖励，去喜好池多加几件吧", "info"); return; }
             d.perk = p;
             d.rerolled = true;
+            d.customText = null; d.editing = false;
+            showChestResult();
+        }
+
+        // 自己从这一档的喜好池里挑
+        function toggleChestPick() {
+            const d = currentDraw; if (!d) return;
+            d.picking = !d.picking; d.editing = false;
+            showChestResult();
+        }
+        function pickChestPerk(id) {
+            const d = currentDraw; if (!d) return;
+            const p = state.perks.find(x => x.id === id); if (!p) return;
+            d.perk = p; d.customText = null; d.picking = false;
+            showChestResult();
+        }
+
+        // 直接改写抽到的内容
+        function toggleChestEdit() {
+            const d = currentDraw; if (!d) return;
+            d.editing = !d.editing; d.picking = false;
+            if (d.editing) {
+                const input = document.getElementById("chestEditInput");
+                input.value = (d.customText || "").trim() || d.perk.text;
+                d.customText = input.value;
+                document.getElementById("chestEditSave").checked = false;
+                setTimeout(() => { input.focus(); input.select(); }, 50);
+            }
             showChestResult();
         }
 
@@ -2767,10 +2821,15 @@
             const d = currentDraw;
             if (!d) return;
             const n = new Date(), pad = (x) => String(x).padStart(2, "0");
+            const custom = (d.customText || "").trim();
+            const text = custom || d.perk.text;
+            if (custom && custom !== d.perk.text && document.getElementById("chestEditSave").checked && !state.perks.some(p => p.text === custom)) {
+                state.perks.push({ id: uid("perk"), text: custom, cat: d.perk.cat, tier: d.tier, when: "any" });
+            }
             state.history.unshift({
                 icon: (PERK_CATS[d.perk.cat] || {}).icon || d.chest.icon,
-                title: `${d.chest.name}（${d.label}）：${d.perk.text}`,
-                perkText: d.perk.text,
+                title: `${d.chest.name}（${d.label}）：${text}`,
+                perkText: text,
                 cost: 0,
                 day: state.currentDate,
                 time: `${pad(n.getMonth() + 1)}-${pad(n.getDate())} ${pad(n.getHours())}:${pad(n.getMinutes())}`
@@ -2998,7 +3057,7 @@
 
         // ==================== 新版本检测 ====================
         // 每次上传新的 index.html 时把这个数字 +1，已打开的页面会提示刷新
-        const APP_VERSION = "11";
+        const APP_VERSION = "12";
         async function checkForUpdate() {
             if (!/^https?:/.test(location.protocol)) return;
             try {
