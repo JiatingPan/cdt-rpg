@@ -70,7 +70,7 @@
                 </div>
                 <h1 class="font-bold text-base sm:text-lg tracking-tight text-white truncate">
                     数字孪生学者 RPG
-                    <span class="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 ml-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 align-middle">v12</span>
+                    <span class="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 ml-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 align-middle">v14</span>
                 </h1>
             </div>
 
@@ -334,7 +334,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div>
                         <h2 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-dice text-amber-400"></i>神秘宝箱 · 随机奖励</h2>
-                        <p class="text-xs text-slate-400 mt-0.5">靠工作量获得：当天日常任务全部完成 → 铜宝箱；一周达标 6 天 → 银宝箱；一月达标 20 天 → 金宝箱。三种互不影响，没开的会一直保留</p>
+                        <p id="chestRuleText" class="text-xs text-slate-400 mt-0.5">按赚到的金币获得：当天赚到 60 金 → 铜宝箱；一周赚到 360 金 → 银宝箱；一月赚到 1300 金 → 金宝箱。算的是赚到的，不是余额，所以三种互不影响；没开的会一直保留</p>
                     </div>
                     <button onclick="openPerkModal()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer">
                         <i class="fa-solid fa-heart"></i><span>管理我的喜好池</span>
@@ -778,8 +778,8 @@
             streakPrevValue: 0,
             currentFilter: "ALL",
             updatedAt: 0,
-            schema: 10,
-            chestRules: { dailyPct: 100, weekDays: 6, monthDays: 20 }, // 宝箱达标规则
+            schema: 11,
+            chestRules: { copper: 60, silver: 360, gold: 1300 }, // 宝箱门槛：当天 / 当周 / 当月赚到的金币
             claims: { copper: {}, silver: {}, gold: {} },             // 已开启的宝箱：{ 日期/周一/月份: 开启日 }
             dayTotals: {},                                              // 每天的日常任务总数（用来判断当天是否达标）
             stats: [
@@ -953,6 +953,8 @@
             }
             // v10：宝箱改为按工作量获得（每天达标→铜，一周 6 天→银，一月 20 天→金），不再用金币购买
             if (ver < 10) s.schema = 10;
+            // v11：宝箱门槛改为固定金币数：每天 60、每周 360、每月 1300
+            if (ver < 11) { s.chestRules = { copper: 60, silver: 360, gold: 1300 }; s.schema = 11; }
         }
 
         function migrateV4(s, raw) {
@@ -997,7 +999,7 @@
                 g.rewardGold = Number(g.rewardGold || 0);
             });
             s.tasks.forEach(t => { if (t.goalId === undefined) t.goalId = ""; });
-            s.chestRules = { dailyPct: 100, weekDays: 6, monthDays: 20, ...(s.chestRules || {}) };
+            s.chestRules = { copper: 60, silver: 360, gold: 1300, ...(s.chestRules || {}) };
             const cl = s.claims && typeof s.claims === "object" ? s.claims : {};
             s.claims = { copper: { ...(cl.copper || {}) }, silver: { ...(cl.silver || {}) }, gold: { ...(cl.gold || {}) } };
             s.updatedAt = Number(s.updatedAt || 0);
@@ -1378,13 +1380,13 @@
             document.getElementById("todayProgressBar").style.width = total ? `${Math.round(done.length / total * 100)}%` : "0%";
 
             const hintEl = document.getElementById("chestUnlockHint");
-            const k = state.currentDate, need = dailyNeed(k), got = dailyDone(k);
+            const k = state.currentDate, need = chestNeeds().copper, got = dayEarn(k);
             const keys = availableClaims("copper").length + availableClaims("silver").length + availableClaims("gold").length;
             if (qualifies(k)) {
                 hintEl.innerHTML = `<button onclick="switchTab('shop')" class="text-amber-300 font-semibold cursor-pointer">🥉 今日已达标${keys ? ` · 有 ${keys} 个宝箱可以开 →` : ""}</button>`;
                 hintEl.className = "text-xs";
             } else {
-                hintEl.innerHTML = `🥉 今日铜宝箱：日常任务 <span class="font-mono font-bold text-slate-200">${got}/${need}</span>，还差 <span class="font-mono font-bold text-slate-200">${Math.max(0, need - got)}</span> 项${keys ? ` · <button onclick="switchTab('shop')" class="text-amber-300 cursor-pointer">有 ${keys} 个宝箱可以开 →</button>` : ""}`;
+                hintEl.innerHTML = `🥉 今日铜宝箱：已赚 <span class="font-mono font-bold text-slate-200">${got}/${need}</span> 金，还差 <span class="font-mono font-bold text-slate-200">${Math.max(0, need - got)}</span>${keys ? ` · <button onclick="switchTab('shop')" class="text-amber-300 cursor-pointer">有 ${keys} 个宝箱可以开 →</button>` : ""}`;
                 hintEl.className = "text-xs text-slate-400";
             }
         }
@@ -1841,11 +1843,10 @@
             if (task.completed && event) spawnFloatingText(event.clientX, event.clientY, `+${task.xp} XP  +${task.gold} 金币`);
 
             // 刚刚达标 → 提示获得宝箱
-            const after = chestProgress();
-            const R = state.chestRules;
-            if (!before.todayOk && after.todayOk) setTimeout(() => showToast("🥉 今日工作量达标！获得 1 个铜宝箱，去商店开启吧", "levelup"), 300);
-            if (before.week < R.weekDays && after.week >= R.weekDays) setTimeout(() => showToast(`🥈 本周已达标 ${after.week} 天！获得 1 个银宝箱`, "levelup"), 900);
-            if (before.month < R.monthDays && after.month >= R.monthDays) setTimeout(() => showToast(`🥇 本月已达标 ${after.month} 天！获得 1 个金宝箱`, "levelup"), 1500);
+            const after = chestProgress(), N = chestNeeds();
+            if (!before.todayOk && after.todayOk) setTimeout(() => showToast(`🥉 今天已赚 ${after.today} 金，达到一天的工作量！获得 1 个铜宝箱`, "levelup"), 300);
+            if (before.week < N.silver && after.week >= N.silver) setTimeout(() => showToast(`🥈 本周已赚 ${after.week} 金！获得 1 个银宝箱`, "levelup"), 900);
+            if (before.month < N.gold && after.month >= N.gold) setTimeout(() => showToast(`🥇 本月已赚 ${after.month} 金！获得 1 个金宝箱`, "levelup"), 1500);
         }
 
         function shortDay(k) { const d = parseDay(k); return `${d.getMonth() + 1}/${d.getDate()}`; }
@@ -2620,40 +2621,39 @@
 
         let currentDraw = null;
 
-        // ---------- 达标判断：当天「日常」任务完成比例 ≥ 达标线 ----------
+        // ---------- 宝箱按「赚到的金币」计算（不是余额，花掉金币不影响进度） ----------
+        // 一天的工作量 = 模板里所有「日常」任务的金币之和；铜 = 当天赚够一天的量，银 = 一周赚够 N 天的量，金 = 一月赚够 M 天的量
         const TIER_CLAIM = { small: "copper", medium: "silver", large: "gold" };
         function liveDailyTotal() { return state.tasks.filter(t => t.type === "DAILY" && !t.carriedFrom).length; }
-        function dailyNeed(k) {
-            const total = k === state.currentDate ? liveDailyTotal() : (state.dayTotals[k] || state.template.filter(t => t.type === "DAILY").length);
-            return Math.max(1, Math.ceil(total * state.chestRules.dailyPct / 100 - 1e-9));
+        function dayBaseGold() { return Math.max(1, state.template.filter(t => t.type === "DAILY").reduce((a, t) => a + Number(t.gold || 0), 0)); }
+        function chestNeeds() {
+            const R = state.chestRules;
+            return { base: dayBaseGold(), copper: Math.max(1, Number(R.copper) || 60), silver: Math.max(1, Number(R.silver) || 360), gold: Math.max(1, Number(R.gold) || 1300) };
         }
-        function dailyDone(k) {
-            const tplType = new Map(state.template.map(t => [t.id, t.type]));
-            const seen = new Set();
-            (state.log[k] || []).forEach(e => {
-                const type = e.type || tplType.get(e.tid) || "DAILY";
-                if (type === "DAILY" && !String(e.tid).startsWith("carry")) seen.add(e.tid);
-            });
-            return seen.size;
+        function dayEarn(k) {
+            return (state.log[k] || []).reduce((a, e) => a + Number(e.gold || 0), 0) + (state.bonusGold[k] || 0);
         }
-        function qualifies(k) { return !!state.log[k] && dailyDone(k) >= dailyNeed(k); }
+        function qualifies(k) { return dayEarn(k) >= chestNeeds().copper; }
         function weekStart(k) { const d = parseDay(k); return shiftDay(k, -((d.getDay() + 6) % 7)); }
-        function weekCount(monday) { let n = 0; for (let i = 0; i < 7; i++) if (qualifies(shiftDay(monday, i))) n++; return n; }
-        function monthCount(ym) { return Object.keys(state.log).filter(k => k.startsWith(ym) && qualifies(k)).length; }
+        function weekEarn(monday) { let n = 0; for (let i = 0; i < 7; i++) n += dayEarn(shiftDay(monday, i)); return n; }
+        function monthEarn(ym) {
+            const keys = new Set([...Object.keys(state.log), ...Object.keys(state.bonusGold)].filter(k => k.startsWith(ym)));
+            let n = 0; keys.forEach(k => { n += dayEarn(k); }); return n;
+        }
+        function earnDays() { return [...new Set([...Object.keys(state.log), ...Object.keys(state.bonusGold)])].sort(); }
 
         function chestProgress() {
             const k = state.currentDate;
-            return { todayOk: qualifies(k), week: weekCount(weekStart(k)), month: monthCount(k.slice(0, 7)) };
+            return { today: dayEarn(k), todayOk: qualifies(k), week: weekEarn(weekStart(k)), month: monthEarn(k.slice(0, 7)) };
         }
 
-        // 还没开的宝箱：铜=每个达标日，银=达标 ≥ N 天的周，金=达标 ≥ M 天的月
+        // 还没开的宝箱：铜=赚够的每一天，银=赚够的每一周，金=赚够的每一月
         function availableClaims(tier) {
-            const R = state.chestRules, done = state.claims[tier];
-            const qDays = Object.keys(state.log).filter(qualifies).sort();
+            const N = chestNeeds(), done = state.claims[tier], days = earnDays();
             let periods;
-            if (tier === "copper") periods = qDays;
-            else if (tier === "silver") periods = [...new Set(qDays.map(weekStart))].filter(w => weekCount(w) >= R.weekDays);
-            else periods = [...new Set(qDays.map(k => k.slice(0, 7)))].filter(m => monthCount(m) >= R.monthDays);
+            if (tier === "copper") periods = days.filter(qualifies);
+            else if (tier === "silver") periods = [...new Set(days.map(weekStart))].filter(w => weekEarn(w) >= N.silver);
+            else periods = [...new Set(days.map(k => k.slice(0, 7)))].filter(m => monthEarn(m) >= N.gold);
             return periods.filter(p => !(p in done)).sort();
         }
 
@@ -2669,12 +2669,13 @@
                 ctx.reasons.map(r => `<span class="text-[11px] px-2 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-slate-300">${escapeHtml(r)}</span>`).join("") +
                 `<span class="text-[11px] px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300">✨ 暴击率 ${Math.round(ctx.crit * 100)}%</span>`;
 
-            const R = state.chestRules, k = state.currentDate, pr = chestProgress();
+            const k = state.currentDate, pr = chestProgress(), N = chestNeeds();
+            document.getElementById("chestRuleText").textContent = `按赚到的金币获得：当天赚到 ${N.copper} 金 → 铜宝箱；一周赚到 ${N.silver} 金 → 银宝箱；一月赚到 ${N.gold} 金 → 金宝箱。算的是赚到的，不是余额，所以三种互不影响；没开的会一直保留`;
             const ym = k.slice(0, 7), [yy, mm] = ym.split("-").map(Number);
             const progress = {
-                copper: { cur: dailyDone(k), need: dailyNeed(k), text: `今天日常 ${dailyDone(k)}/${dailyNeed(k)} 项` },
-                silver: { cur: pr.week, need: R.weekDays, text: `本周达标 ${pr.week}/${R.weekDays} 天` },
-                gold: { cur: pr.month, need: R.monthDays, text: `${mm} 月达标 ${pr.month}/${R.monthDays} 天` }
+                copper: { cur: pr.today, need: N.copper, text: `今天已赚 ${pr.today}/${N.copper} 金` },
+                silver: { cur: pr.week, need: N.silver, text: `本周已赚 ${pr.week}/${N.silver} 金` },
+                gold: { cur: pr.month, need: N.gold, text: `${mm} 月已赚 ${pr.month}/${N.gold} 金` }
             };
             // 当前这一期（今天 / 本周 / 本月）是否已经开过
             const curClaimed = { copper: k in state.claims.copper, silver: weekStart(k) in state.claims.silver, gold: ym in state.claims.gold };
@@ -2857,13 +2858,15 @@
             const field = (icon, pre, key, val, min, max, post) => `
                 <label class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-2 flex items-center gap-1.5">
                     <span>${icon}</span><span class="text-slate-400">${pre}</span>
-                    <input type="number" min="${min}" max="${max}" value="${val}" onchange="updateChestRule('${key}', this.value, ${min}, ${max})" class="w-12 bg-transparent font-mono text-amber-400 focus:outline-none text-center">
+                    <input type="number" min="${min}" max="${max}" value="${val}" onchange="updateChestRule('${key}', this.value, ${min}, ${max})" class="w-16 bg-transparent font-mono text-amber-400 focus:outline-none text-center">
                     <span class="text-slate-400">${post}</span>
                 </label>`;
+            const N = chestNeeds();
             document.getElementById("chestRuleEditor").innerHTML =
-                field("🥉", "日常完成", "dailyPct", R.dailyPct, 50, 100, "%") +
-                field("🥈", "一周达标", "weekDays", R.weekDays, 1, 7, "天") +
-                field("🥇", "一月达标", "monthDays", R.monthDays, 1, 31, "天");
+                field("🥉", "每天赚", "copper", R.copper, 1, 100000, "金") +
+                field("🥈", "每周赚", "silver", R.silver, 1, 100000, "金") +
+                field("🥇", "每月赚", "gold", R.gold, 1, 1000000, "金") +
+                `<div class="sm:col-span-3 text-[11px] text-slate-500 mt-1">参考：每日模板的日常任务全部完成一天是 ${N.base} 金</div>`;
 
             const list = TIER_ORDER.flatMap(t => state.perks.filter(p => p.tier === t));
             document.getElementById("perkEditList").innerHTML = list.length ? list.map(p => `
@@ -3057,7 +3060,7 @@
 
         // ==================== 新版本检测 ====================
         // 每次上传新的 index.html 时把这个数字 +1，已打开的页面会提示刷新
-        const APP_VERSION = "12";
+        const APP_VERSION = "14";
         async function checkForUpdate() {
             if (!/^https?:/.test(location.protocol)) return;
             try {
