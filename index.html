@@ -70,7 +70,7 @@
                 </div>
                 <h1 class="font-bold text-base sm:text-lg tracking-tight text-white truncate">
                     数字孪生学者 RPG
-                    <span class="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 ml-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 align-middle">v15</span>
+                    <span class="hidden sm:inline-block text-[11px] font-mono px-2 py-0.5 ml-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 align-middle">v17</span>
                 </h1>
             </div>
 
@@ -193,18 +193,20 @@
             <div class="lg:col-span-8 glow-card rounded-2xl p-5 sm:p-6">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
                     <div>
-                        <h2 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-list-check text-cyan-400"></i>今日任务</h2>
+                        <h2 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-list-check text-cyan-400"></i><span id="taskPanelTitle">今日任务</span></h2>
                         <p class="text-xs text-slate-400 mt-0.5">每天 0 点自动按「每日模板」刷新；勾选即结算 XP 与金币，并记入统计</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <button onclick="openTemplateModal()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-medium transition flex items-center gap-1.5 cursor-pointer">
                             <i class="fa-solid fa-clipboard-list text-cyan-400"></i><span>每日模板</span>
                         </button>
-                        <button onclick="openTaskModal()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5 cursor-pointer">
+                        <button id="addTaskBtn" onclick="openTaskModal()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5 cursor-pointer">
                             <i class="fa-solid fa-plus"></i><span>新增任务</span>
                         </button>
                     </div>
                 </div>
+                <!-- 日期切换：查看过去的记录 / 规划未来某天 -->
+                <div id="dayNav" class="mb-3"></div>
                 <div class="flex flex-wrap items-center gap-2 mb-4 pb-3 border-b border-slate-800/80">
                     <button onclick="setTaskFilter('ALL')" data-filter="ALL" class="filter-btn px-3 py-1 rounded-lg text-xs font-medium border transition cursor-pointer">全部</button>
                     <button onclick="setTaskFilter('DAILY')" data-filter="DAILY" class="filter-btn px-3 py-1 rounded-lg text-xs font-medium border transition cursor-pointer">🎯 日常委托</button>
@@ -535,7 +537,7 @@
                 <h3 class="font-bold text-lg text-white flex items-center gap-2"><i class="fa-solid fa-clipboard-list text-cyan-400"></i>每日模板</h3>
                 <button onclick="closeModal('templateModal')" class="text-slate-400 hover:text-white p-1"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
-            <p class="text-xs text-slate-400 mb-4">每天 0 点，今日任务会重置成这份清单。在这里的修改会同步到今天还没完成的任务。</p>
+            <p class="text-xs text-slate-400 mb-4">每天 0 点，今日任务会重置成这份清单。在这里的修改会同步到今天还没完成的任务，以及所有还没单独改过的未来日子；单独改过的未来某天保留它自己的安排。</p>
             <div id="templateList" class="space-y-2 mb-4"></div>
             <button onclick="openTaskModal(null, true)" class="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 text-xs font-semibold cursor-pointer"><i class="fa-solid fa-plus mr-1"></i>向模板添加任务</button>
         </div>
@@ -780,7 +782,8 @@
             streakPrevValue: 0,
             currentFilter: "ALL",
             updatedAt: 0,
-            schema: 11,
+            schema: 12,
+            days: {},  // 每天的任务单：过去的日子 = 当天结束时的完整记录（lived: true）；未来的日子 = 单独改过的计划
             chestRules: { copper: 60, silver: 360, gold: 1300 }, // 宝箱门槛：当天 / 当周 / 当月赚到的金币
             claims: { copper: {}, silver: {}, gold: {} },             // 已开启的宝箱：{ 日期/周一/月份: 开启日 }
             dayTotals: {},                                              // 每天的日常任务总数（用来判断当天是否达标）
@@ -957,6 +960,21 @@
             if (ver < 10) s.schema = 10;
             // v11：宝箱门槛改为固定金币数：每天 60、每周 360、每月 1300
             if (ver < 11) { s.chestRules = { copper: 60, silver: 360, gold: 1300 }; s.schema = 11; }
+            // v12：每天的任务单单独保存；旧的「顺延」标记改成直接放进明天的计划
+            if (ver < 12) {
+                if (!s.days || typeof s.days !== "object") s.days = {};
+                const tomorrow = shiftDay(s.currentDate || dayKey(), 1);
+                s.tasks.forEach(t => {
+                    if (t.carry && !t.completed) {
+                        if (!s.days[tomorrow]) s.days[tomorrow] = { tasks: s.template.map(x => ({ ...taskFields(x), steps: daySteps(x, false), completed: false })) };
+                        const copy = { ...taskFields(t), steps: daySteps(t, true), id: uid("carry"), completed: false, carriedFrom: t.carriedFrom || s.currentDate };
+                        s.days[tomorrow].tasks.unshift(copy);
+                        t.postponedTo = tomorrow; t.postponeCopyId = copy.id;
+                    }
+                    delete t.carry;
+                });
+                s.schema = 12;
+            }
         }
 
         function migrateV4(s, raw) {
@@ -991,7 +1009,7 @@
             const base = clone(DEFAULT_STATE);
             const s = { ...base, ...(obj || {}) };
             ["stats", "tasks", "rewards", "history", "goals", "chests", "perks", "template", "shopping"].forEach(k => { if (!Array.isArray(s[k])) s[k] = clone(base[k]); });
-            ["log", "repaired", "bonusGold", "meals", "shopFreq", "dayTotals"].forEach(k => { if (!s[k] || typeof s[k] !== "object" || Array.isArray(s[k])) s[k] = {}; });
+            ["log", "repaired", "bonusGold", "meals", "shopFreq", "dayTotals", "days"].forEach(k => { if (!s[k] || typeof s[k] !== "object" || Array.isArray(s[k])) s[k] = {}; });
             migrate(s, obj);
             if (!s.currentDate) s.currentDate = dayKey();
             s.goals.forEach(g => {
@@ -1110,6 +1128,9 @@
             ["repaired", "bonusGold", "meals", "dayTotals"].forEach(f => Object.keys(src[f] || {}).forEach(k => {
                 if (k !== target.currentDate && !(k in target[f])) target[f][k] = src[f][k];
             }));
+            Object.keys(src.days || {}).forEach(k => {
+                if (k < target.currentDate && !(k in target.days)) target.days[k] = src.days[k];
+            });
             // 已开过的宝箱取并集，避免两台设备各开一次同一个宝箱
             ["copper", "silver", "gold"].forEach(t => Object.keys((src.claims || {})[t] || {}).forEach(k => {
                 if (!(k in target.claims[t])) target.claims[t][k] = src.claims[t][k];
@@ -1497,17 +1518,120 @@
             });
         }
 
+        function renderDayNav() {
+            const k = vDate(), m = viewMode(), d = parseDay(k);
+            const title = m === "today" ? "今日任务" : m === "past" ? `${d.getMonth() + 1}/${d.getDate()} 的记录` : `${d.getMonth() + 1}/${d.getDate()} 的计划`;
+            document.getElementById("taskPanelTitle").textContent = title;
+            const addBtn = document.getElementById("addTaskBtn");
+            addBtn.classList.toggle("hidden", m === "past");
+            let badge = "";
+            if (m === "past") badge = `<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700">📜 记录 · 只能查看</span>`;
+            if (m === "future") badge = state.days[k]
+                ? `<span class="px-2 py-1 rounded-lg bg-purple-500/15 text-purple-300 border border-purple-500/30">🗓 已单独安排</span><button onclick="restoreFutureTemplate()" class="px-2 py-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer">恢复成模板</button>`
+                : `<span class="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700">🗓 按模板 · 改动只影响这一天</span>`;
+            document.getElementById("dayNav").innerHTML = `
+                <div class="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/60 border ${m === "today" ? "border-slate-800" : m === "past" ? "border-slate-600" : "border-purple-500/40"}">
+                    <div class="flex items-center gap-1">
+                        <button onclick="shiftView(-1)" class="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer" title="前一天"><i class="fa-solid fa-chevron-left"></i></button>
+                        <button onclick="toggleDayCal()" class="px-2 py-1 rounded-lg hover:bg-slate-800 cursor-pointer text-sm text-white font-semibold flex items-center gap-1.5" title="打开日历">
+                            <i class="fa-regular fa-calendar text-cyan-400 text-xs"></i>
+                            ${d.getMonth() + 1}/${d.getDate()} ${WEEKDAYS[d.getDay()]} <span class="text-xs font-normal ${m === "today" ? "text-emerald-300" : "text-slate-400"}">· ${relLabel(k)}</span>
+                            <i class="fa-solid fa-chevron-down text-[10px] text-slate-500 transition-transform ${calOpen ? "rotate-180" : ""}"></i>
+                        </button>
+                        <button onclick="shiftView(1)" class="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer" title="后一天"><i class="fa-solid fa-chevron-right"></i></button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        ${badge}
+                        ${m !== "today" ? `<button onclick="setViewDate(state.currentDate)" class="px-2 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 cursor-pointer">回到今天</button>` : ""}
+                    </div>
+                </div>
+                ${calOpen ? renderDayCal() : ""}`;
+        }
+
+        // ---------- 日历：点开某一天查看 ----------
+        let calOpen = false;
+        let calMonth = null; // "YYYY-MM"
+        function toggleDayCal() { calOpen = !calOpen; calMonth = vDate().slice(0, 7); renderDayNav(); }
+        function shiftCalMonth(n) {
+            const [y, m] = calMonth.split("-").map(Number);
+            const d = new Date(y, m - 1 + n, 1);
+            calMonth = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`;
+            renderDayNav();
+        }
+        function pickCalDay(k) { calOpen = false; setViewDate(k); }
+
+        function renderDayCal() {
+            if (!calMonth) calMonth = vDate().slice(0, 7);
+            const [y, m] = calMonth.split("-").map(Number);
+            const first = new Date(y, m - 1, 1);
+            const daysIn = new Date(y, m, 0).getDate();
+            const lead = (first.getDay() + 6) % 7; // 周一开头
+            const today = state.currentDate, sel = vDate();
+            let cells = "";
+            for (let i = 0; i < lead; i++) cells += `<div></div>`;
+            for (let d = 1; d <= daysIn; d++) {
+                const k = `${calMonth}-${pad2(d)}`;
+                const past = k < today, future = k > today;
+                const n = k === today ? state.tasks.filter(t => t.completed).length : (state.log[k] || []).length;
+                const total = k === today ? state.tasks.length : (state.days[k] ? state.days[k].tasks.length : 0);
+                const planned = future && state.days[k];
+                const hasRecord = past && (state.days[k] || state.log[k]);
+                let bg = "rgba(30,41,59,0.5)";
+                if (!future && n) bg = heatBg(n);
+                if (planned) bg = "rgba(168,85,247,0.18)";
+                cells += `
+                    <button onclick="pickCalDay('${k}')" class="min-h-[46px] rounded-lg flex flex-col items-center justify-center gap-0.5 cursor-pointer border ${k === sel ? "border-cyan-400" : k === today ? "border-emerald-400/70" : "border-transparent hover:border-slate-600"}" style="background:${bg}">
+                        <span class="text-[11px] leading-none ${k === today ? "text-emerald-300 font-bold" : (n || planned) ? "text-white font-semibold" : past && !hasRecord ? "text-slate-600" : "text-slate-400"}">${d}</span>
+                        ${!future && (n || total) ? `<span class="font-mono text-[9px] leading-none text-emerald-100">${n}${total ? "/" + total : ""}</span>` : ""}
+                        ${planned ? `<span class="text-[9px] leading-none">🗓</span>` : ""}
+                    </button>`;
+            }
+            return `
+                <div class="mt-2 p-3 rounded-xl bg-slate-950/80 border border-slate-700">
+                    <div class="flex items-center justify-between mb-2">
+                        <button onclick="shiftCalMonth(-1)" class="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                        <div class="text-sm font-semibold text-white">${y} 年 ${m} 月</div>
+                        <button onclick="shiftCalMonth(1)" class="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] text-slate-500 mb-1">${["一", "二", "三", "四", "五", "六", "日"].map(w => `<div>${w}</div>`).join("")}</div>
+                    <div class="grid grid-cols-7 gap-1">${cells}</div>
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-500">
+                        <span><span class="inline-block w-2.5 h-2.5 rounded-sm align-middle" style="background:rgba(16,185,129,0.62)"></span> 完成数 / 任务数</span>
+                        <span><span class="inline-block w-2.5 h-2.5 rounded-sm align-middle border border-emerald-400"></span> 今天</span>
+                        <span>🗓 单独安排过的未来日子</span>
+                        <button onclick="calOpen=false; renderDayNav()" class="ml-auto text-slate-400 hover:text-white cursor-pointer">收起</button>
+                    </div>
+                </div>`;
+        }
+
         function renderTasks() {
             renderFilterButtons();
+            renderDayNav();
             const container = document.getElementById("taskListContainer");
-            const filtered = state.tasks.filter(t => state.currentFilter === "ALL" || t.type === state.currentFilter);
+            const m = viewMode(), k = vDate();
+            const list = viewTasks();
 
+            // 更早的日子（这个功能上线之前）没有保存任务单，只能显示当天完成了哪些
+            if (!list) {
+                const done = state.log[k] || [];
+                container.innerHTML = done.length
+                    ? `<p class="text-xs text-slate-500 mb-2">这一天没有保存完整的任务单，下面是当天完成的任务：</p>` + done.map(e => `
+                        <div class="rounded-xl p-3 border bg-slate-900/40 border-emerald-500/30 flex items-center gap-3">
+                            <span class="w-5 h-5 rounded-md bg-emerald-500 text-slate-950 flex items-center justify-center text-[10px]"><i class="fa-solid fa-check"></i></span>
+                            <span class="text-sm text-slate-300 flex-1">${escapeHtml(e.title)}</span>
+                            <span class="font-mono text-[10px] text-amber-400">+${e.gold} 金</span>
+                        </div>`).join("")
+                    : `<div class="text-center py-10 px-4 border border-dashed border-slate-800 rounded-2xl"><div class="text-3xl mb-2">📭</div><p class="text-sm text-slate-400">这一天没有任务记录</p></div>`;
+                return;
+            }
+
+            const filtered = list.filter(t => state.currentFilter === "ALL" || t.type === state.currentFilter);
             if (filtered.length === 0) {
                 container.innerHTML = `
                     <div class="text-center py-10 px-4 border border-dashed border-slate-800 rounded-2xl">
                         <div class="text-3xl mb-2">📜</div>
-                        <p class="text-sm text-slate-400">当前分类下还没有任务</p>
-                        <button onclick="openTaskModal()" class="mt-3 px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-medium cursor-pointer">+ 创建一条新任务</button>
+                        <p class="text-sm text-slate-400">${m === "past" ? "这一天在这个分类下没有任务" : "当前分类下还没有任务"}</p>
+                        ${m === "past" ? "" : `<button onclick="openTaskModal()" class="mt-3 px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs font-medium cursor-pointer">+ 创建一条新任务</button>`}
                     </div>`;
                 return;
             }
@@ -1517,45 +1641,55 @@
                 BUFF: { label: "⚡ Buff", cls: "bg-purple-500/15 text-purple-300 border-purple-500/30" },
                 LOW_POWER: { label: "🔋 保底", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" }
             };
+            const live = m === "today";
 
             container.innerHTML = filtered.map(task => {
                 const stat = getStat(task.statId);
                 const style = COLOR_STYLES[stat.color] || COLOR_STYLES.cyan;
                 const tBadge = typeBadges[task.type] || typeBadges.DAILY;
                 const goal = task.goalId ? state.goals.find(g => g.id === task.goalId && !g.completed) : null;
+                const hasSteps = (task.steps || []).length > 0;
+                const postponed = !task.completed && task.postponedTo;
+                const box = task.completed ? "bg-emerald-500 border-emerald-400 text-slate-950" : "bg-slate-950 border-slate-600 text-transparent";
                 return `
-                    <div class="group rounded-xl p-4 border transition-all duration-200 ${task.completed ? "bg-slate-900/40 border-emerald-500/30 opacity-80" : "bg-slate-900/90 border-slate-800 hover:border-slate-700"}">
+                    <div class="group rounded-xl p-4 border transition-all duration-200 ${task.completed ? "bg-slate-900/40 border-emerald-500/30 opacity-80" : postponed ? "bg-slate-900/50 border-amber-500/30 border-dashed" : m === "future" ? "bg-slate-900/70 border-purple-500/20" : "bg-slate-900/90 border-slate-800 hover:border-slate-700"}">
                         <div class="flex items-start gap-3.5">
-                            <button onclick="toggleTask('${task.id}', event)" class="mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center border transition shrink-0 cursor-pointer ${task.completed ? "bg-emerald-500 border-emerald-400 text-slate-950" : "bg-slate-950 border-slate-600 hover:border-cyan-400 text-transparent"}">
-                                <i class="fa-solid fa-check text-xs"></i>
-                            </button>
-                            <div class="flex-1 min-w-0 ${(task.steps || []).length ? "" : "cursor-pointer"}" ${(task.steps || []).length ? "" : `onclick="toggleTask('${task.id}', event)"`}>
-                                <h3 class="font-semibold text-sm mb-1 ${task.completed ? "line-through text-slate-500" : "text-slate-100"}">${escapeHtml(task.title)}</h3>
+                            ${live
+                                ? `<button onclick="toggleTask('${task.id}', event)" class="mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center border transition shrink-0 cursor-pointer ${box} ${task.completed ? "" : "hover:border-cyan-400"}"><i class="fa-solid fa-check text-xs"></i></button>`
+                                : `<span class="mt-0.5 w-6 h-6 rounded-lg flex items-center justify-center border shrink-0 ${m === "future" ? "border-dashed border-slate-700 text-transparent" : box}"><i class="fa-solid ${postponed ? "fa-forward text-amber-300" : "fa-check"} text-xs"></i></span>`}
+                            <div class="flex-1 min-w-0 ${live && !hasSteps ? "cursor-pointer" : ""}" ${live && !hasSteps ? `onclick="toggleTask('${task.id}', event)"` : ""}>
+                                <h3 class="font-semibold text-sm mb-1 ${task.completed ? "line-through text-slate-500" : postponed ? "text-slate-400" : "text-slate-100"}">${escapeHtml(task.title)}</h3>
                                 ${task.desc ? `<p class="text-xs text-slate-400 leading-relaxed mb-2">${escapeHtml(task.desc)}</p>` : ""}
-                                ${(task.steps || []).length ? `
+                                ${hasSteps ? `
                                     <div class="mb-2.5 space-y-0.5">
-                                        ${task.steps.map(x => `
+                                        ${task.steps.map(x => live ? `
                                             <button onclick="toggleStep('${task.id}', '${x.id}', event)" class="w-full flex items-center gap-2 text-left px-1.5 py-1 rounded-md hover:bg-slate-800/70 cursor-pointer">
                                                 <span class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ${x.done ? "bg-cyan-500 border-cyan-400 text-slate-950" : "border-slate-600 text-transparent"}"><i class="fa-solid fa-check text-[8px]"></i></span>
                                                 <span class="text-xs ${x.done ? "line-through text-slate-500" : "text-slate-300"}">${escapeHtml(x.text)}</span>
-                                            </button>`).join("")}
+                                            </button>` : `
+                                            <div class="flex items-center gap-2 px-1.5 py-1">
+                                                <span class="w-4 h-4 rounded border flex items-center justify-center shrink-0 ${x.done ? "bg-cyan-500/70 border-cyan-400/70 text-slate-950" : "border-slate-700 text-transparent"}"><i class="fa-solid fa-check text-[8px]"></i></span>
+                                                <span class="text-xs ${x.done ? "line-through text-slate-500" : "text-slate-400"}">${escapeHtml(x.text)}</span>
+                                            </div>`).join("")}
                                     </div>` : ""}
                                 <div class="flex flex-wrap items-center gap-1.5 text-[10px]">
                                     <span class="px-1.5 py-0.5 rounded font-mono font-bold ${style.badge} border ${style.border}">${escapeHtml(stat.code)}</span>
                                     <span class="px-1.5 py-0.5 rounded font-medium border ${tBadge.cls}">${tBadge.label}</span>
-                                    ${(task.steps || []).length ? `<span class="px-1.5 py-0.5 rounded font-mono border ${task.completed ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" : "bg-cyan-500/10 text-cyan-300 border-cyan-500/30"}">☑ ${task.steps.filter(x => x.done).length}/${task.steps.length}</span>` : ""}
+                                    ${hasSteps ? `<span class="px-1.5 py-0.5 rounded font-mono border ${task.completed ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" : "bg-cyan-500/10 text-cyan-300 border-cyan-500/30"}">☑ ${task.steps.filter(x => x.done).length}/${task.steps.length}</span>` : ""}
                                     ${goal ? `<span class="px-1.5 py-0.5 rounded font-medium border bg-purple-500/10 text-purple-300 border-purple-500/30 max-w-[12rem] truncate"><i class="fa-solid fa-mountain mr-0.5"></i>${escapeHtml(goal.title)}</span>` : ""}
-                                    ${task.carriedFrom ? `<span class="px-1.5 py-0.5 rounded font-medium border bg-sky-500/10 text-sky-300 border-sky-500/30">⏩ ${shortDay(task.carriedFrom)} 顺延</span>` : ""}
-                                    ${task.carry && !task.completed ? `<span onclick="event.stopPropagation(); toggleCarry('${task.id}')" class="px-1.5 py-0.5 rounded font-medium border bg-amber-500/15 text-amber-300 border-amber-500/40 cursor-pointer" title="点击取消">⏭ 明天继续 ✕</span>` : ""}
+                                    ${task.carriedFrom ? `<span class="px-1.5 py-0.5 rounded font-medium border bg-sky-500/10 text-sky-300 border-sky-500/30">⏩ 从 ${shortDay(task.carriedFrom)} 推迟来</span>` : ""}
+                                    ${postponed ? `<span ${live ? `onclick="event.stopPropagation(); postponeTask('${task.id}')" title="点击取消推迟"` : ""} class="px-1.5 py-0.5 rounded font-medium border bg-amber-500/15 text-amber-300 border-amber-500/40 ${live ? "cursor-pointer" : ""}">⏭ 已推迟到 ${shortDay(task.postponedTo)}${live ? " ✕" : ""}</span>` : ""}
+                                    ${m === "past" && !task.completed && !postponed ? `<span class="px-1.5 py-0.5 rounded font-medium border bg-slate-800 text-slate-500 border-slate-700">未完成</span>` : ""}
                                     <span class="font-mono font-semibold text-cyan-400 ml-1">+${task.xp} XP</span>
                                     <span class="font-mono font-semibold text-amber-400">+${task.gold} 金</span>
                                 </div>
                             </div>
+                            ${m === "past" ? "" : `
                             <div class="flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
-                                ${task.completed ? "" : `<button onclick="toggleCarry('${task.id}')" class="p-1.5 rounded-lg ${task.carry ? "text-amber-300 bg-amber-500/10" : "text-slate-500 hover:text-amber-300 hover:bg-slate-800"} cursor-pointer" title="没做完，顺延到明天"><i class="fa-solid fa-forward text-xs"></i></button>`}
+                                ${task.completed ? "" : `<button onclick="postponeTask('${task.id}')" class="p-1.5 rounded-lg ${postponed ? "text-amber-300 bg-amber-500/10" : "text-slate-500 hover:text-amber-300 hover:bg-slate-800"} cursor-pointer" title="${live ? (postponed ? "取消推迟" : "推迟到明天（今天的记录会保留）") : "移到后一天"}"><i class="fa-solid fa-forward text-xs"></i></button>`}
                                 <button onclick="openTaskModal('${task.id}')" class="p-1.5 rounded-lg text-slate-500 hover:text-cyan-400 hover:bg-slate-800 cursor-pointer" title="编辑"><i class="fa-solid fa-pen-to-square text-xs"></i></button>
                                 <button onclick="deleteTask('${task.id}')" class="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-800 cursor-pointer" title="删除"><i class="fa-solid fa-trash-can text-xs"></i></button>
-                            </div>
+                            </div>`}
                         </div>
                     </div>`;
             }).join("");
@@ -1825,6 +1959,11 @@
         // 统一处理任务完成 / 取消完成：发放或扣回奖励、目标推进、当天统计
         function setTaskCompleted(task, completed, event) {
             if (!!task.completed === completed) return;
+            if (completed && task.postponedTo) {
+                const to = task.postponedTo;
+                undoPostpone(task);
+                setTimeout(() => showToast(`今天完成了，已取消推迟到 ${shortDay(to)} 的那一份`, "info"), 200);
+            }
             const before = chestProgress();
             const key = state.currentDate;
             const dayLog = state.log[key] || [];
@@ -1853,35 +1992,96 @@
 
         function shortDay(k) { const d = parseDay(k); return `${d.getMonth() + 1}/${d.getDate()}`; }
 
-        function toggleCarry(taskId) {
-            const t = state.tasks.find(x => x.id === taskId);
-            if (!t || t.completed) return;
-            t.carry = !t.carry;
-            saveState();
-            renderTasks();
-            showToast(t.carry ? "⏭ 已标记：明天会继续出现这项任务" : "已取消顺延", "info");
+        // ==================== 按天查看 / 规划 ====================
+        let viewDate = null; // null = 今天
+        function vDate() { return viewDate || state.currentDate; }
+        function viewMode() { const k = vDate(); return k === state.currentDate ? "today" : (k < state.currentDate ? "past" : "future"); }
+        function setViewDate(k) { if (!k) return; viewDate = k === state.currentDate ? null : k; renderTasks(); }
+        function shiftView(n) { setViewDate(shiftDay(vDate(), n)); }
+        function tplDayTasks() { return state.template.map(t => ({ ...taskFields(t), steps: daySteps(t, false), completed: false })); }
+        // 未来某天第一次被修改时，先按模板生成一份属于这一天的任务单
+        function ensureDay(k) { if (!state.days[k]) state.days[k] = { tasks: tplDayTasks() }; return state.days[k].tasks; }
+        function viewTasks() {
+            const k = vDate(), m = viewMode();
+            if (m === "today") return state.tasks;
+            if (state.days[k]) return state.days[k].tasks;
+            return m === "future" ? tplDayTasks() : null;
+        }
+        function relLabel(k) {
+            const diff = Math.round((parseDay(k) - parseDay(state.currentDate)) / 86400000);
+            if (diff === 0) return "今天";
+            if (diff === -1) return "昨天";
+            if (diff === 1) return "明天";
+            return diff < 0 ? `${-diff} 天前` : `${diff} 天后`;
         }
 
-        // ---------- 每天 0 点按模板刷新 ----------
+        function restoreFutureTemplate() {
+            const k = vDate();
+            if (viewMode() !== "future" || !state.days[k]) return;
+            showConfirm(`把 ${shortDay(k)} 恢复成模板？`, "这一天单独做的修改会被清掉（包括推迟到这天的任务），以后这一天会跟着每日模板走。", () => {
+                state.tasks.forEach(t => { if (t.postponedTo === k) { delete t.postponedTo; delete t.postponeCopyId; } });
+                delete state.days[k];
+                saveState(); renderTasks();
+                showToast(`${shortDay(k)} 已恢复成模板`, "info");
+            });
+        }
+
+        // ---------- 推迟到下一天 ----------
+        // 今天：复制一份到明天的计划里，今天的记录保留这一条，并标注「已推迟」
+        // 未来某天：直接把这条移到后一天
+        function undoPostpone(t) {
+            const d = state.days[t.postponedTo];
+            if (d) d.tasks = d.tasks.filter(x => x.id !== t.postponeCopyId);
+            delete t.postponedTo; delete t.postponeCopyId;
+        }
+
+        function postponeTask(taskId) {
+            const k = vDate(), m = viewMode(), next = shiftDay(k, 1);
+            if (m === "past") return;
+            if (m === "today") {
+                const t = state.tasks.find(x => x.id === taskId);
+                if (!t || t.completed) return;
+                if (t.postponedTo) {
+                    undoPostpone(t); saveState(); renderTasks();
+                    showToast("已取消推迟", "info");
+                    return;
+                }
+                // 模板任务明天本来就有一份，推迟过去的是额外的一份；已经勾掉的小步骤一起带过去
+                const copy = { ...taskFields(t), steps: daySteps(t, true), id: uid("carry"), completed: false, carriedFrom: t.carriedFrom || k };
+                ensureDay(next).unshift(copy);
+                t.postponedTo = next; t.postponeCopyId = copy.id;
+                saveState(); renderTasks();
+                showToast(`⏩ 已推迟到 ${shortDay(next)}；今天的记录里也会保留这一条`, "info");
+            } else {
+                const list = ensureDay(k);
+                const i = list.findIndex(x => x.id === taskId);
+                if (i < 0) return;
+                const [t] = list.splice(i, 1);
+                t.carriedFrom = t.carriedFrom || k;
+                ensureDay(next).unshift(t);
+                saveState(); renderTasks();
+                showToast(`已移到 ${shortDay(next)}`, "info");
+            }
+        }
+
+        // ---------- 每天 0 点：保存昨天的完整任务单，今天用计划好的（没有就用模板） ----------
         function checkRollover() {
             const today = dayKey();
             if (state.currentDate === today) return false;
-            // 标记了「顺延」且没完成的任务，带到新的一天（放在最前面）
             const from = state.currentDate;
             state.dayTotals[from] = liveDailyTotal();
-            const carried = state.tasks.filter(t => t.carry && !t.completed).map(t => {
-                const inTpl = state.template.some(x => x.id === t.id);
-                // 模板任务明天本来就会出现，所以顺延的是额外的一份，例如「文献 1 篇」→ 明天要做 2 篇
-                // 顺延时保留已经勾掉的小步骤，第二天接着做
-                return { ...taskFields(t), steps: daySteps(t, true), id: inTpl ? uid("carry") : t.id, completed: false, carriedFrom: t.carriedFrom || from };
-            });
-            state.tasks = [...carried, ...state.template.map(t => ({ ...taskFields(t), steps: daySteps(t, false), completed: false }))];
+            state.days[from] = { lived: true, tasks: clone(state.tasks) };
+            const planned = state.days[today] ? state.days[today].tasks : tplDayTasks();
+            delete state.days[today];
+            planned.forEach(t => { t.completed = false; delete t.postponedTo; delete t.postponeCopyId; });
+            state.tasks = planned;
             // 采购清单：已经买到的移走，没买的留到新的一天
             state.shopping = state.shopping.filter(i => !i.done);
             state.currentDate = today;
+            if (viewDate && viewDate === today) viewDate = null;
             saveState();
             renderAll();
-            showToast("🌅 新的一天，任务已按模板刷新！", "success");
+            showToast("🌅 新的一天，任务已刷新！昨天的任务单已存进记录", "success");
             return true;
         }
 
@@ -1915,10 +2115,14 @@
         // fromTemplate=true：从「每日模板」窗口打开，改的是模板
         let taskModalFromTemplate = false;
 
+        let taskModalDate = null; // 正在编辑哪一天（未来某天时才有值）
+
         function openTaskModal(taskId = null, fromTemplate = false) {
             taskModalFromTemplate = fromTemplate;
+            if (!fromTemplate && viewMode() === "past") return;
+            taskModalDate = !fromTemplate && viewMode() === "future" ? vDate() : null;
             const tpl = taskId ? state.template.find(t => t.id === taskId) : null;
-            const today = taskId ? state.tasks.find(t => t.id === taskId) : null;
+            const today = taskId ? (taskModalDate ? viewTasks() : state.tasks).find(t => t.id === taskId) : null;
             const task = fromTemplate ? (tpl || today) : (today || tpl);
             document.getElementById("taskForm").reset();
             fillStatSelect("taskStatInput", task && task.statId);
@@ -1931,7 +2135,8 @@
             document.getElementById("taskTypeInput").value = task ? task.type : "DAILY";
             document.getElementById("taskXpInput").value = task ? task.xp : 25;
             document.getElementById("taskGoldInput").value = task ? task.gold : 15;
-            document.getElementById("taskScopeRow").classList.toggle("hidden", fromTemplate);
+            document.getElementById("taskScopeRow").classList.toggle("hidden", fromTemplate || !!taskModalDate);
+            if (taskModalDate) document.getElementById("taskModalTitle").textContent = task ? `编辑 ${shortDay(taskModalDate)} 的任务` : `给 ${shortDay(taskModalDate)} 添加任务`;
             // 编辑已有任务默认只改今天（写当天的具体安排）；新建任务默认加入模板
             document.getElementById("taskScopeInput").value = task ? "today" : "template";
             document.getElementById("taskModal").classList.remove("hidden");
@@ -1968,6 +2173,17 @@
                 if (t.steps.length && t.steps.every(x => x.done) && !t.completed) setTaskCompleted(t, true);
             };
 
+            // 未来某天：只改这一天的计划
+            if (taskModalDate) {
+                const list = ensureDay(taskModalDate);
+                const t = id ? list.find(x => x.id === id) : null;
+                if (t) Object.assign(t, data, { steps: buildSteps(t.steps, true) });
+                else list.push({ id: uid("task"), ...data, steps: buildSteps([], true), completed: false });
+                showToast(`已更新 ${shortDay(taskModalDate)} 的计划`, "success");
+                saveState(); closeModal("taskModal"); renderTasks();
+                return;
+            }
+
             if (id) {
                 const today = state.tasks.find(t => t.id === id);
                 const tpl = state.template.find(t => t.id === id);
@@ -1993,6 +2209,16 @@
         }
 
         function deleteTask(taskId) {
+            if (viewMode() === "past") return;
+            if (viewMode() === "future") {
+                const k = vDate();
+                showConfirm(`从 ${shortDay(k)} 删除这项任务？`, "只影响这一天，模板和其他日子不变。", () => {
+                    state.days[k] = { tasks: ensureDay(k).filter(t => t.id !== taskId) };
+                    state.tasks.forEach(t => { if (t.postponeCopyId === taskId) { delete t.postponedTo; delete t.postponeCopyId; } });
+                    saveState(); renderTasks();
+                });
+                return;
+            }
             const inTpl = state.template.some(t => t.id === taskId);
             const removeToday = () => { state.tasks = state.tasks.filter(t => t.id !== taskId); };
             if (!inTpl) {
@@ -2212,6 +2438,8 @@
             });
             state.claims = { copper: {}, silver: {}, gold: {} };
             state.dayTotals = {};
+            state.days = {};
+            state.tasks.forEach(t => { delete t.postponedTo; delete t.postponeCopyId; });
             state.resetId = uid("reset");
             state.currentDate = dayKey();
             statsSelected = null; statsMonth = null;
@@ -3075,7 +3303,7 @@
 
         // ==================== 新版本检测 ====================
         // 每次上传新的 index.html 时把这个数字 +1，已打开的页面会提示刷新
-        const APP_VERSION = "15";
+        const APP_VERSION = "17";
         async function checkForUpdate() {
             if (!/^https?:/.test(location.protocol)) return;
             try {
